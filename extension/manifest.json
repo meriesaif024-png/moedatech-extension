@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Team Feedback Pins",
+  "name": "Moedatech Detector",
   "version": "2.0.0",
   "description": "Leave feedback notes pinned to specific elements on the team's web apps, shared with the whole team.",
   "permissions": ["tabs", "storage"],
@@ -22,6 +22,6 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Team Feedback Pins"
+    "default_title": "Moedatech Detector"
   }
 }
