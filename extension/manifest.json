@@ -1,10 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Site Problem Finder",
-  "version": "1.0.0",
-  "description": "Detects JS errors, console errors, and failed network requests on the current page.",
-  "permissions": ["webRequest", "webNavigation", "tabs"],
-  "host_permissions": ["https://ai.moedatech.net/*", "https://web-beta.moedatech.net/*"],
+  "name": "Team Feedback Pins",
+  "version": "2.0.0",
+  "description": "Leave feedback notes pinned to specific elements on the team's web apps, shared with the whole team.",
+  "permissions": ["tabs", "storage"],
+  "host_permissions": [
+    "https://ai.moedatech.net/*",
+    "https://web-beta.moedatech.net/*",
+    "https://feedback-api-production-ed54.up.railway.app/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -12,11 +16,11 @@
     {
       "matches": ["https://ai.moedatech.net/*", "https://web-beta.moedatech.net/*"],
       "js": ["content.js"],
-      "run_at": "document_start"
+      "run_at": "document_idle"
     }
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Site Problem Finder"
+    "default_title": "Team Feedback Pins"
   }
 }

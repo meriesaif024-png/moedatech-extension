@@ -1,111 +1,98 @@
-const issueListEl = document.getElementById("issueList");
+const noteListEl = document.getElementById("noteList");
 const statusEl = document.getElementById("status");
+const authorInput = document.getElementById("authorName");
 
 let activeTabId = null;
-
-const TYPE_LABELS = {
-  "js-error": "JS Error",
-  "unhandled-rejection": "Promise",
-  "console-error": "Console",
-  "http-error": "HTTP",
-  "network-error": "Network",
-  "resource-error": "Resource",
-  "broken-link": "Link",
-};
+let activeTabUrl = null;
 
 async function getActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   return tab;
 }
 
-function renderIssues(issues) {
-  issueListEl.innerHTML = "";
-  if (!issues.length) {
-    issueListEl.innerHTML = '<li class="empty">No problems detected yet.</li>';
+function sendMessage(message) {
+  return new Promise((resolve) => chrome.runtime.sendMessage(message, resolve));
+}
+
+function renderNotes(notes) {
+  noteListEl.innerHTML = "";
+  if (!notes.length) {
+    noteListEl.innerHTML = '<li class="empty">No feedback notes on this page yet.</li>';
     return;
   }
-  const sorted = [...issues].sort((a, b) => b.timestamp - a.timestamp);
-  for (const issue of sorted) {
+  const sorted = [...notes].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  for (const note of sorted) {
     const li = document.createElement("li");
-    const label = TYPE_LABELS[issue.type] || issue.type;
+    if (note.status === "done") li.classList.add("done");
     li.innerHTML = `
-      <span class="badge ${issue.type}">${label}</span>
-      <span class="detail">${escapeHtml(issue.detail || "")}</span>
-      <span class="url">${escapeHtml(issue.url || "")}</span>
+      <span class="badge ${note.category}">${note.category}</span>
+      <span class="noteText">${escapeHtml(note.text)}</span>
+      <span class="noteMeta">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</span>
+      <div class="noteActions">
+        <button data-action="toggle" data-id="${note.id}" data-status="${note.status}">${note.status === "done" ? "Reopen" : "Mark done"}</button>
+        <button data-action="delete" data-id="${note.id}">Delete</button>
+      </div>
     `;
-    issueListEl.appendChild(li);
+    noteListEl.appendChild(li);
   }
 }
 
 function escapeHtml(str) {
   const div = document.createElement("div");
-  div.textContent = str;
+  div.textContent = str || "";
   return div.innerHTML;
 }
 
-async function loadIssues() {
-  if (activeTabId == null) return;
-  const response = await chrome.runtime.sendMessage({ type: "SPF_GET_ISSUES", tabId: activeTabId });
-  renderIssues(response?.issues || []);
-}
-
-document.getElementById("clear").addEventListener("click", async () => {
-  if (activeTabId == null) return;
-  await chrome.runtime.sendMessage({ type: "SPF_CLEAR", tabId: activeTabId });
-  loadIssues();
-});
-
-const dropZone = document.getElementById("dropZone");
-const fileInput = document.getElementById("fileInput");
-const previewEl = document.getElementById("preview");
-
-function showImageFile(file) {
-  if (!file || !file.type.startsWith("image/")) {
-    statusEl.textContent = "That's not an image file.";
+async function loadNotes() {
+  if (!activeTabUrl) return;
+  const response = await sendMessage({ type: "SPF_GET_NOTES", url: activeTabUrl });
+  if (response?.error) {
+    statusEl.textContent = `Error: ${response.error}`;
     return;
   }
-  const reader = new FileReader();
-  reader.onload = () => {
-    previewEl.src = reader.result;
-    previewEl.hidden = false;
-    statusEl.textContent = `Loaded ${file.name}`;
-  };
-  reader.readAsDataURL(file);
+  renderNotes(response?.notes || []);
 }
 
-dropZone.addEventListener("click", () => fileInput.click());
+noteListEl.addEventListener("click", async (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  const id = btn.dataset.id;
 
-fileInput.addEventListener("change", () => {
-  if (fileInput.files[0]) showImageFile(fileInput.files[0]);
+  if (btn.dataset.action === "toggle") {
+    const newStatus = btn.dataset.status === "done" ? "open" : "done";
+    await sendMessage({ type: "SPF_UPDATE_STATUS", id, status: newStatus });
+    loadNotes();
+  }
+
+  if (btn.dataset.action === "delete") {
+    await sendMessage({ type: "SPF_DELETE_NOTE", id });
+    loadNotes();
+  }
 });
 
-dropZone.addEventListener("dragover", (e) => {
-  e.preventDefault();
-  dropZone.classList.add("dragover");
+authorInput.addEventListener("change", () => {
+  chrome.storage.local.set({ spfAuthorName: authorInput.value.trim() || "Anonymous" });
 });
 
-dropZone.addEventListener("dragleave", () => {
-  dropZone.classList.remove("dragover");
-});
-
-dropZone.addEventListener("drop", (e) => {
-  e.preventDefault();
-  dropZone.classList.remove("dragover");
-  const file = e.dataTransfer.files[0];
-  if (file) showImageFile(file);
-});
-
-document.getElementById("scanLinks").addEventListener("click", async () => {
+document.getElementById("addNote").addEventListener("click", async () => {
   if (activeTabId == null) return;
-  statusEl.textContent = "Scanning links on this page...";
-  const response = await chrome.runtime.sendMessage({ type: "SPF_SCAN_LINKS", tabId: activeTabId });
-  const count = response?.results?.length ?? 0;
-  statusEl.textContent = count ? `Found ${count} broken link(s).` : "No broken links found.";
-  loadIssues();
+  await chrome.tabs.sendMessage(activeTabId, { type: "SPF_START_ANNOTATE" }).catch(() => {
+    statusEl.textContent = "Can't annotate this page (reload the page and try again).";
+  });
+  window.close();
+});
+
+document.getElementById("viewAll").addEventListener("click", (e) => {
+  e.preventDefault();
+  chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
 });
 
 (async function init() {
+  const { spfAuthorName } = await chrome.storage.local.get(["spfAuthorName"]);
+  authorInput.value = spfAuthorName || "";
+
   const tab = await getActiveTab();
   activeTabId = tab?.id ?? null;
-  await loadIssues();
+  activeTabUrl = tab?.url ?? null;
+  await loadNotes();
 })();

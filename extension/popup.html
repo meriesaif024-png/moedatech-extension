@@ -2,24 +2,25 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Site Problem Finder</title>
+    <title>Team Feedback Pins</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <header>
-      <h1>Site Problem Finder</h1>
+      <h1>Feedback Pins</h1>
       <div class="actions">
-        <button id="scanLinks">Scan links</button>
-        <button id="clear">Clear</button>
+        <button id="addNote">+ Add note</button>
       </div>
     </header>
-    <div id="status"></div>
-    <div id="dropZone">
-      <span>Drag a screenshot here, or click to choose a file</span>
-      <input type="file" id="fileInput" accept="image/*" hidden />
+    <div class="authorRow">
+      <label for="authorName">Your name:</label>
+      <input type="text" id="authorName" placeholder="e.g. Saif" />
     </div>
-    <img id="preview" hidden />
-    <ul id="issueList"></ul>
+    <div id="status"></div>
+    <ul id="noteList"></ul>
+    <footer>
+      <a id="viewAll" href="#">View all notes across the site</a>
+    </footer>
     <script src="popup.js"></script>
   </body>
 </html>
