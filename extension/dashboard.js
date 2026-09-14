@@ -1,5 +1,4 @@
 const groupsEl = document.getElementById("groups");
-const hideDoneEl = document.getElementById("hideDone");
 
 function sendMessage(message) {
   return new Promise((resolve) => chrome.runtime.sendMessage(message, resolve));
@@ -21,16 +20,13 @@ async function load() {
 }
 
 function render(notes) {
-  const hideDone = hideDoneEl.checked;
-  const filtered = hideDone ? notes.filter((n) => n.status !== "done") : notes;
-
-  if (!filtered.length) {
+  if (!notes.length) {
     groupsEl.innerHTML = '<div class="empty">No feedback notes yet.</div>';
     return;
   }
 
   const byUrl = new Map();
-  for (const note of filtered) {
+  for (const note of notes) {
     if (!byUrl.has(note.url)) byUrl.set(note.url, []);
     byUrl.get(note.url).push(note);
   }
@@ -44,7 +40,7 @@ function render(notes) {
 
     for (const note of notes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))) {
       const div = document.createElement("div");
-      div.className = "note" + (note.status === "done" ? " done" : "");
+      div.className = "note";
       const screenshotHtml = note.screenshot
         ? `<img src="${note.screenshot}" style="max-width:280px;border-radius:4px;display:block;margin-top:4px;" />`
         : "";
@@ -55,7 +51,6 @@ function render(notes) {
         ${screenshotHtml}
         <div class="noteActions">
           <button data-action="goto" data-id="${note.id}" data-url="${escapeHtml(note.url)}">Go to spot</button>
-          <button data-action="toggle" data-id="${note.id}" data-status="${note.status}">${note.status === "done" ? "Reopen" : "Mark done"}</button>
           <button data-action="delete" data-id="${note.id}">Delete</button>
         </div>
       `;
@@ -76,12 +71,6 @@ groupsEl.addEventListener("click", async (e) => {
     return;
   }
 
-  if (btn.dataset.action === "toggle") {
-    const newStatus = btn.dataset.status === "done" ? "open" : "done";
-    await sendMessage({ type: "SPF_UPDATE_STATUS", id, status: newStatus });
-    load();
-  }
-
   if (btn.dataset.action === "delete") {
     await sendMessage({ type: "SPF_DELETE_NOTE", id });
     load();
@@ -89,6 +78,5 @@ groupsEl.addEventListener("click", async (e) => {
 });
 
 document.getElementById("refresh").addEventListener("click", load);
-hideDoneEl.addEventListener("change", load);
 
 load();

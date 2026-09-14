@@ -38,13 +38,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "SPF_UPDATE_STATUS") {
-    api(`/api/notes/${message.id}`, { method: "PATCH", body: JSON.stringify({ status: message.status }) })
-      .then((note) => sendResponse({ note }))
-      .catch((err) => sendResponse({ error: err.message }));
-    return true;
-  }
-
   if (message.type === "SPF_DELETE_NOTE") {
     api(`/api/notes/${message.id}`, { method: "DELETE" })
       .then(() => sendResponse({ ok: true }))

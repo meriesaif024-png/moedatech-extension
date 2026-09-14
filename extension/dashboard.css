@@ -61,10 +61,6 @@ h1 {
   border-bottom: none;
 }
 
-.note.done {
-  opacity: 0.5;
-}
-
 .badge {
   display: inline-block;
   font-size: 10px;

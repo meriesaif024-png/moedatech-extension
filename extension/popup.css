@@ -45,10 +45,6 @@ h1 {
   font-size: 12px;
 }
 
-#noteList li.done {
-  opacity: 0.5;
-}
-
 .badge {
   display: inline-block;
   font-size: 10px;

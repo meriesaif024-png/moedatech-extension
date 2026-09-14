@@ -145,14 +145,13 @@
       const pos = positionForNote(note);
       const pin = document.createElement("div");
       const color = CATEGORY_COLORS[note.category] || CATEGORY_COLORS.other;
-      const doneStyle = note.status === "done" ? "opacity:0.4;" : "";
       pin.style.cssText = `
         position:absolute;left:${pos.x}px;top:${pos.y}px;
         width:22px;height:22px;border-radius:50% 50% 50% 0;
         transform:translate(-50%,-100%) rotate(45deg);
         background:${color};border:2px solid white;
         box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:pointer;
-        pointer-events:auto;${doneStyle}
+        pointer-events:auto;
       `;
       pin.title = note.text;
 
@@ -183,30 +182,18 @@
       font-size:12px;z-index:2147483647;
     `;
 
-    const statusLabel = note.status === "done" ? "Done" : "Open";
     const screenshotHtml = note.screenshot
       ? `<img src="${note.screenshot}" style="max-width:100%;border-radius:4px;border:1px solid #eee;margin-bottom:6px;" />`
       : "";
     card.innerHTML = `
-      <div style="font-weight:600;text-transform:capitalize;margin-bottom:4px;">${note.category} &middot; ${statusLabel}</div>
+      <div style="font-weight:600;text-transform:capitalize;margin-bottom:4px;">${note.category}</div>
       ${screenshotHtml}
       <div style="margin-bottom:6px;white-space:pre-wrap;">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</div>
       <div style="color:#666;font-size:11px;margin-bottom:8px;">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</div>
       <div style="display:flex;gap:6px;">
-        <button data-action="toggle" style="flex:1;">${note.status === "done" ? "Reopen" : "Mark done"}</button>
         <button data-action="delete" style="flex:1;">Delete</button>
       </div>
     `;
-
-    card.querySelector('[data-action="toggle"]').addEventListener("click", async (e) => {
-      e.stopPropagation();
-      const newStatus = note.status === "done" ? "open" : "done";
-      chrome.runtime.sendMessage({ type: "SPF_UPDATE_STATUS", id: note.id, status: newStatus }, async () => {
-        card.remove();
-        openPopover = null;
-        renderPins(await fetchNotes());
-      });
-    });
 
     card.querySelector('[data-action="delete"]').addEventListener("click", (e) => {
       e.stopPropagation();

@@ -22,7 +22,6 @@ function renderNotes(notes) {
   const sorted = [...notes].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   for (const note of sorted) {
     const li = document.createElement("li");
-    if (note.status === "done") li.classList.add("done");
     const screenshotHtml = note.screenshot
       ? `<img src="${note.screenshot}" style="max-width:100%;border-radius:4px;margin-top:4px;" />`
       : "";
@@ -32,7 +31,6 @@ function renderNotes(notes) {
       ${screenshotHtml}
       <span class="noteMeta">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</span>
       <div class="noteActions">
-        <button data-action="toggle" data-id="${note.id}" data-status="${note.status}">${note.status === "done" ? "Reopen" : "Mark done"}</button>
         <button data-action="delete" data-id="${note.id}">Delete</button>
       </div>
     `;
@@ -60,12 +58,6 @@ noteListEl.addEventListener("click", async (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
   const id = btn.dataset.id;
-
-  if (btn.dataset.action === "toggle") {
-    const newStatus = btn.dataset.status === "done" ? "open" : "done";
-    await sendMessage({ type: "SPF_UPDATE_STATUS", id, status: newStatus });
-    loadNotes();
-  }
 
   if (btn.dataset.action === "delete") {
     await sendMessage({ type: "SPF_DELETE_NOTE", id });
