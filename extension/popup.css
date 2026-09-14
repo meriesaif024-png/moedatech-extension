@@ -1,0 +1,122 @@
+body {
+  width: 420px;
+  max-height: 560px;
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  color: #1f1f1f;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+h1 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.actions button {
+  font-size: 12px;
+  padding: 4px 8px;
+  margin-left: 6px;
+  cursor: pointer;
+}
+
+#status {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #666;
+}
+
+#dropZone {
+  margin: 8px 12px;
+  padding: 16px 10px;
+  border: 2px dashed #c4c4c4;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: #666;
+  cursor: pointer;
+}
+
+#dropZone.dragover {
+  border-color: #1a73e8;
+  background: rgba(26, 115, 232, 0.08);
+  color: #1a73e8;
+}
+
+#preview {
+  display: block;
+  max-width: calc(100% - 24px);
+  margin: 0 12px 8px;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+#issueList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 460px;
+  overflow-y: auto;
+}
+
+#issueList li {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 12px;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  color: #fff;
+  margin-right: 6px;
+  text-transform: uppercase;
+}
+
+.badge.js-error,
+.badge.unhandled-rejection {
+  background: #d93025;
+}
+
+.badge.console-error {
+  background: #e37400;
+}
+
+.badge.http-error,
+.badge.network-error,
+.badge.resource-error {
+  background: #7b1fa2;
+}
+
+.badge.broken-link {
+  background: #1a73e8;
+}
+
+.detail {
+  display: block;
+  margin-top: 2px;
+  word-break: break-word;
+}
+
+.url {
+  display: block;
+  color: #666;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+}

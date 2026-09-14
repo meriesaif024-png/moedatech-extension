@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Site Problem Finder",
+  "version": "1.0.0",
+  "description": "Detects JS errors, console errors, and failed network requests on the current page.",
+  "permissions": ["webRequest", "webNavigation", "tabs"],
+  "host_permissions": ["https://ai.moedatech.net/*", "https://web-beta.moedatech.net/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://ai.moedatech.net/*", "https://web-beta.moedatech.net/*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Site Problem Finder"
+  }
+}
