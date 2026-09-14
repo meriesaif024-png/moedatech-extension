@@ -45,10 +45,14 @@ function render(notes) {
     for (const note of notes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))) {
       const div = document.createElement("div");
       div.className = "note" + (note.status === "done" ? " done" : "");
+      const screenshotHtml = note.screenshot
+        ? `<img src="${note.screenshot}" style="max-width:280px;border-radius:4px;display:block;margin-top:4px;" />`
+        : "";
       div.innerHTML = `
         <span class="badge ${note.category}">${note.category}</span>
         <span class="noteMeta">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</span>
         <span class="noteText">${escapeHtml(note.text)}</span>
+        ${screenshotHtml}
         <div class="noteActions">
           <button data-action="toggle" data-id="${note.id}" data-status="${note.status}">${note.status === "done" ? "Reopen" : "Mark done"}</button>
           <button data-action="delete" data-id="${note.id}">Delete</button>

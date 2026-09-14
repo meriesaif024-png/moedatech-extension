@@ -127,8 +127,12 @@
     `;
 
     const statusLabel = note.status === "done" ? "Done" : "Open";
+    const screenshotHtml = note.screenshot
+      ? `<img src="${note.screenshot}" style="max-width:100%;border-radius:4px;border:1px solid #eee;margin-bottom:6px;" />`
+      : "";
     card.innerHTML = `
       <div style="font-weight:600;text-transform:capitalize;margin-bottom:4px;">${note.category} &middot; ${statusLabel}</div>
+      ${screenshotHtml}
       <div style="margin-bottom:6px;white-space:pre-wrap;">${escapeHtml(note.text)}</div>
       <div style="color:#666;font-size:11px;margin-bottom:8px;">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</div>
       <div style="display:flex;gap:6px;">
@@ -221,32 +225,42 @@
     e.stopPropagation();
 
     const target = e.target;
-    const rect = target.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
     const selector = buildSelector(target);
     const docEl = document.documentElement;
-    const xPercent = ((rect.left + window.scrollX) / docEl.scrollWidth) * 100;
-    const yPercent = ((rect.top + window.scrollY) / docEl.scrollHeight) * 100;
+    const xPercent = ((targetRect.left + window.scrollX) / docEl.scrollWidth) * 100;
+    const yPercent = ((targetRect.top + window.scrollY) / docEl.scrollHeight) * 100;
 
     stopAnnotate();
-    showAnnotationForm(e.clientX, e.clientY, { selector, xPercent, yPercent });
+    showAnnotationForm(e.clientX, e.clientY, { selector, xPercent, yPercent }, targetRect);
   }
 
-  async function showAnnotationForm(clientX, clientY, position) {
+  const CATEGORIES = [
+    { key: "bug", label: "Bug" },
+    { key: "remove", label: "Remove" },
+    { key: "add", label: "Add" },
+    { key: "change", label: "Change" },
+  ];
+
+  async function showAnnotationForm(clientX, clientY, position, targetRect) {
+    let selectedCategory = "bug";
+    let screenshotDataUrl = null;
+
     const form = document.createElement("div");
     form.style.cssText = `
-      position:fixed;left:${Math.min(clientX, window.innerWidth - 260)}px;top:${Math.min(clientY, window.innerHeight - 200)}px;
+      position:fixed;left:${Math.min(clientX, window.innerWidth - 260)}px;top:${Math.min(clientY, window.innerHeight - 260)}px;
       width:240px;background:white;color:#1f1f1f;border-radius:8px;
       box-shadow:0 4px 16px rgba(0,0,0,0.3);padding:10px;
       font:12px system-ui,sans-serif;z-index:2147483647;
     `;
+
+    const categoryButtonsHtml = CATEGORIES.map(
+      (c) => `<button type="button" data-category="${c.key}" class="spf-cat-btn" style="flex:1;padding:5px 0;border:1px solid ${CATEGORY_COLORS[c.key]};background:${c.key === selectedCategory ? CATEGORY_COLORS[c.key] : "white"};color:${c.key === selectedCategory ? "white" : CATEGORY_COLORS[c.key]};border-radius:4px;cursor:pointer;">${c.label}</button>`
+    ).join("");
+
     form.innerHTML = `
-      <select id="spf-category" style="width:100%;margin-bottom:6px;padding:4px;">
-        <option value="bug">Bug</option>
-        <option value="remove">Remove</option>
-        <option value="add">Add</option>
-        <option value="change">Change</option>
-        <option value="other">Other</option>
-      </select>
+      <div style="display:flex;gap:4px;margin-bottom:6px;">${categoryButtonsHtml}</div>
+      <div id="spf-shot-preview" style="margin-bottom:6px;font-size:11px;color:#888;">Capturing screenshot&hellip;</div>
       <textarea id="spf-text" placeholder="What's the note?" style="width:100%;height:60px;margin-bottom:6px;box-sizing:border-box;padding:4px;"></textarea>
       <div style="display:flex;gap:6px;">
         <button id="spf-save" style="flex:1;">Save</button>
@@ -256,12 +270,40 @@
     document.documentElement.appendChild(form);
     form.querySelector("#spf-text").focus();
 
+    form.querySelectorAll(".spf-cat-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        selectedCategory = btn.dataset.category;
+        form.querySelectorAll(".spf-cat-btn").forEach((b) => {
+          const color = CATEGORY_COLORS[b.dataset.category];
+          const active = b.dataset.category === selectedCategory;
+          b.style.background = active ? color : "white";
+          b.style.color = active ? "white" : color;
+        });
+      });
+    });
+
+    chrome.runtime.sendMessage(
+      {
+        type: "SPF_CAPTURE_ELEMENT",
+        rect: { x: targetRect.left, y: targetRect.top, width: targetRect.width, height: targetRect.height },
+        dpr: window.devicePixelRatio || 1,
+      },
+      (response) => {
+        const preview = form.querySelector("#spf-shot-preview");
+        if (response?.dataUrl) {
+          screenshotDataUrl = response.dataUrl;
+          preview.innerHTML = `<img src="${response.dataUrl}" style="max-width:100%;border-radius:4px;border:1px solid #eee;" />`;
+        } else {
+          preview.textContent = "Screenshot unavailable";
+        }
+      }
+    );
+
     form.querySelector("#spf-cancel").addEventListener("click", () => form.remove());
 
     form.querySelector("#spf-save").addEventListener("click", async () => {
       const text = form.querySelector("#spf-text").value.trim();
       if (!text) return;
-      const category = form.querySelector("#spf-category").value;
       const author = await getAuthor();
 
       chrome.runtime.sendMessage(
@@ -273,9 +315,10 @@
             selector: position.selector,
             xPercent: position.xPercent,
             yPercent: position.yPercent,
-            category,
+            category: selectedCategory,
             text,
             author,
+            screenshot: screenshotDataUrl,
           },
         },
         async () => {

@@ -25,14 +25,16 @@ async function init() {
       text TEXT NOT NULL,
       author TEXT,
       status TEXT NOT NULL DEFAULT 'open',
+      screenshot TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS screenshot TEXT;`);
 }
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "5mb" }));
 
 app.use((req, res, next) => {
   if (!API_KEY) return next();
@@ -54,13 +56,23 @@ app.get("/api/notes", async (req, res) => {
 });
 
 app.post("/api/notes", async (req, res) => {
-  const { url, pageTitle, selector, xPercent, yPercent, category, text, author } = req.body;
+  const { url, pageTitle, selector, xPercent, yPercent, category, text, author, screenshot } = req.body;
   if (!url || !text) return res.status(400).json({ error: "url and text are required" });
 
   const result = await pool.query(
-    `INSERT INTO notes (url, page_title, selector, x_percent, y_percent, category, text, author)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-    [url, pageTitle || null, selector || null, xPercent ?? null, yPercent ?? null, category || "other", text, author || "Anonymous"]
+    `INSERT INTO notes (url, page_title, selector, x_percent, y_percent, category, text, author, screenshot)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [
+      url,
+      pageTitle || null,
+      selector || null,
+      xPercent ?? null,
+      yPercent ?? null,
+      category || "other",
+      text,
+      author || "Anonymous",
+      screenshot || null,
+    ]
   );
   res.status(201).json(result.rows[0]);
 });

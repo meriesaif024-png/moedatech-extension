@@ -24,9 +24,13 @@ function renderNotes(notes) {
   for (const note of sorted) {
     const li = document.createElement("li");
     if (note.status === "done") li.classList.add("done");
+    const screenshotHtml = note.screenshot
+      ? `<img src="${note.screenshot}" style="max-width:100%;border-radius:4px;margin-top:4px;" />`
+      : "";
     li.innerHTML = `
       <span class="badge ${note.category}">${note.category}</span>
       <span class="noteText">${escapeHtml(note.text)}</span>
+      ${screenshotHtml}
       <span class="noteMeta">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</span>
       <div class="noteActions">
         <button data-action="toggle" data-id="${note.id}" data-status="${note.status}">${note.status === "done" ? "Reopen" : "Mark done"}</button>
