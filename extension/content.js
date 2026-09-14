@@ -420,5 +420,26 @@
 
   window.addEventListener("resize", () => renderPins(currentNotes));
 
-  fetchNotes().then(renderPins);
+  async function checkPendingScroll(notes) {
+    const { spfPendingScroll } = await chrome.storage.local.get(["spfPendingScroll"]);
+    if (!spfPendingScroll || spfPendingScroll.url !== location.href) return;
+    await chrome.storage.local.remove("spfPendingScroll");
+
+    const index = notes.findIndex((n) => n.id === spfPendingScroll.noteId);
+    if (index === -1) return;
+    const note = notes[index];
+    const pos = positionForNote(note);
+
+    window.scrollTo({ top: Math.max(0, pos.y - 120), left: 0, behavior: "smooth" });
+
+    setTimeout(() => {
+      const pin = ensurePinsRoot().children[index];
+      if (pin) togglePopover(pin, note);
+    }, 500);
+  }
+
+  fetchNotes().then((notes) => {
+    renderPins(notes);
+    checkPendingScroll(notes);
+  });
 })();
