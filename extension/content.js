@@ -201,6 +201,10 @@
     return div.innerHTML;
   }
 
+  let dragStart = null;
+  let dragging = false;
+  let annotateHint = null;
+
   function startAnnotate() {
     if (annotating) return;
     annotating = true;
@@ -211,18 +215,54 @@
       "position:fixed;pointer-events:none;border:2px solid #1a73e8;background:rgba(26,115,232,0.12);z-index:2147483646;display:none;";
     getRoot().appendChild(hoverBox);
 
-    document.addEventListener("mousemove", onHoverMove, true);
-    document.addEventListener("click", onAnnotateClick, true);
+    annotateHint = document.createElement("div");
+    annotateHint.style.cssText =
+      "position:fixed;top:12px;left:50%;transform:translateX(-50%);background:#1f1f1f;color:white;padding:6px 12px;border-radius:6px;font-size:12px;z-index:2147483647;pointer-events:none;";
+    annotateHint.textContent = "Click an element, or drag to select a custom area — Esc to cancel";
+    getRoot().appendChild(annotateHint);
+
+    document.addEventListener("mousedown", onAnnotateMouseDown, true);
+    document.addEventListener("mousemove", onAnnotateMouseMove, true);
+    document.addEventListener("mouseup", onAnnotateMouseUp, true);
+    document.addEventListener("click", onAnnotateClickBlock, true);
     document.addEventListener("keydown", onAnnotateKeydown, true);
   }
 
-  function onHoverMove(e) {
-    const rect = e.target.getBoundingClientRect();
+  function showHoverBox(rect) {
     hoverBox.style.display = "block";
     hoverBox.style.left = rect.left + "px";
     hoverBox.style.top = rect.top + "px";
     hoverBox.style.width = rect.width + "px";
     hoverBox.style.height = rect.height + "px";
+  }
+
+  function rectFromPoints(p1, p2) {
+    return {
+      left: Math.min(p1.x, p2.x),
+      top: Math.min(p1.y, p2.y),
+      width: Math.abs(p2.x - p1.x),
+      height: Math.abs(p2.y - p1.y),
+    };
+  }
+
+  function onAnnotateMouseDown(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragStart = { x: e.clientX, y: e.clientY };
+    dragging = true;
+  }
+
+  function onAnnotateMouseMove(e) {
+    if (dragging && dragStart) {
+      showHoverBox(rectFromPoints(dragStart, { x: e.clientX, y: e.clientY }));
+    } else {
+      showHoverBox(e.target.getBoundingClientRect());
+    }
+  }
+
+  function onAnnotateClickBlock(e) {
+    e.preventDefault();
+    e.stopPropagation();
   }
 
   function onAnnotateKeydown(e) {
@@ -231,21 +271,43 @@
 
   function stopAnnotate() {
     annotating = false;
+    dragging = false;
+    dragStart = null;
     document.body.style.cursor = "";
     hoverBox?.remove();
     hoverBox = null;
-    document.removeEventListener("mousemove", onHoverMove, true);
-    document.removeEventListener("click", onAnnotateClick, true);
+    annotateHint?.remove();
+    annotateHint = null;
+    document.removeEventListener("mousedown", onAnnotateMouseDown, true);
+    document.removeEventListener("mousemove", onAnnotateMouseMove, true);
+    document.removeEventListener("mouseup", onAnnotateMouseUp, true);
+    document.removeEventListener("click", onAnnotateClickBlock, true);
     document.removeEventListener("keydown", onAnnotateKeydown, true);
   }
 
-  async function onAnnotateClick(e) {
+  const DRAG_THRESHOLD = 6;
+
+  async function onAnnotateMouseUp(e) {
+    if (!dragging) return;
+    dragging = false;
     e.preventDefault();
     e.stopPropagation();
 
-    const target = e.target;
-    const targetRect = target.getBoundingClientRect();
-    const selector = buildSelector(target);
+    const dragRect = rectFromPoints(dragStart, { x: e.clientX, y: e.clientY });
+    dragStart = null;
+    const isDrag = dragRect.width > DRAG_THRESHOLD || dragRect.height > DRAG_THRESHOLD;
+
+    let selector = null;
+    let targetRect = dragRect;
+
+    if (!isDrag) {
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      if (el) {
+        selector = buildSelector(el);
+        targetRect = el.getBoundingClientRect();
+      }
+    }
+
     const docEl = document.documentElement;
     const xPercent = ((targetRect.left + window.scrollX) / docEl.scrollWidth) * 100;
     const yPercent = ((targetRect.top + window.scrollY) / docEl.scrollHeight) * 100;
