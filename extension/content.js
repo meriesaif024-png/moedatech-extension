@@ -61,6 +61,44 @@
     return parts.join(" > ");
   }
 
+  const ACTIVE_TAB_SELECTORS = [
+    ".tab.on",
+    ".tab.active",
+    ".tab.selected",
+    '[role="tab"][aria-selected="true"]',
+    '[aria-current="true"]',
+    '[aria-current="page"]',
+  ];
+
+  // Many single-page apps switch between in-page "tabs" purely via client-side
+  // state, with no URL change at all - so the URL alone can't tell us which
+  // one was showing. We snapshot which tab-like elements were active when the
+  // note was made and replay clicks on them before jumping back to the note.
+  function captureActiveTabs() {
+    const found = [];
+    for (const sel of ACTIVE_TAB_SELECTORS) {
+      document.querySelectorAll(sel).forEach((el) => found.push(el));
+    }
+    return found.slice(0, 6).map((el) => buildSelector(el));
+  }
+
+  async function restoreActiveTabs(tabSelectorsJson) {
+    if (!tabSelectorsJson) return;
+    let selectors;
+    try {
+      selectors = JSON.parse(tabSelectorsJson);
+    } catch {
+      return;
+    }
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        el.click();
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+    }
+  }
+
   function getAuthor() {
     return new Promise((resolve) => {
       chrome.storage.local.get(["spfAuthorName"], (result) => resolve(result.spfAuthorName || "Anonymous"));
@@ -311,9 +349,10 @@
     const docEl = document.documentElement;
     const xPercent = ((targetRect.left + window.scrollX) / docEl.scrollWidth) * 100;
     const yPercent = ((targetRect.top + window.scrollY) / docEl.scrollHeight) * 100;
+    const tabSelectors = captureActiveTabs();
 
     stopAnnotate();
-    showAnnotationForm(e.clientX, e.clientY, { selector, xPercent, yPercent }, targetRect);
+    showAnnotationForm(e.clientX, e.clientY, { selector, xPercent, yPercent, tabSelectors }, targetRect);
   }
 
   const CATEGORIES = [
@@ -399,6 +438,7 @@
             text,
             author,
             screenshot: screenshotDataUrl,
+            tabSelectors: position.tabSelectors,
           },
         },
         async () => {
@@ -428,8 +468,11 @@
     const index = notes.findIndex((n) => n.id === spfPendingScroll.noteId);
     if (index === -1) return;
     const note = notes[index];
-    const pos = positionForNote(note);
 
+    await restoreActiveTabs(note.tab_selectors);
+    renderPins(notes);
+
+    const pos = positionForNote(note);
     window.scrollTo({ top: Math.max(0, pos.y - 120), left: 0, behavior: "smooth" });
 
     setTimeout(() => {

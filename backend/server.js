@@ -26,10 +26,12 @@ async function init() {
       author TEXT,
       status TEXT NOT NULL DEFAULT 'open',
       screenshot TEXT,
+      tab_selectors TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
   await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS screenshot TEXT;`);
+  await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS tab_selectors TEXT;`);
 }
 
 const app = express();
@@ -56,12 +58,12 @@ app.get("/api/notes", async (req, res) => {
 });
 
 app.post("/api/notes", async (req, res) => {
-  const { url, pageTitle, selector, xPercent, yPercent, category, text, author, screenshot } = req.body;
+  const { url, pageTitle, selector, xPercent, yPercent, category, text, author, screenshot, tabSelectors } = req.body;
   if (!url) return res.status(400).json({ error: "url is required" });
 
   const result = await pool.query(
-    `INSERT INTO notes (url, page_title, selector, x_percent, y_percent, category, text, author, screenshot)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    `INSERT INTO notes (url, page_title, selector, x_percent, y_percent, category, text, author, screenshot, tab_selectors)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
     [
       url,
       pageTitle || null,
@@ -72,6 +74,7 @@ app.post("/api/notes", async (req, res) => {
       text || "",
       author || "Anonymous",
       screenshot || null,
+      tabSelectors ? JSON.stringify(tabSelectors) : null,
     ]
   );
   res.status(201).json(result.rows[0]);
