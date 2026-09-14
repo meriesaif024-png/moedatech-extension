@@ -1,6 +1,5 @@
 const noteListEl = document.getElementById("noteList");
 const statusEl = document.getElementById("status");
-const authorInput = document.getElementById("authorName");
 
 let activeTabId = null;
 let activeTabUrl = null;
@@ -74,16 +73,14 @@ noteListEl.addEventListener("click", async (e) => {
   }
 });
 
-authorInput.addEventListener("change", () => {
-  chrome.storage.local.set({ spfAuthorName: authorInput.value.trim() || "Anonymous" });
-});
-
 document.getElementById("addNote").addEventListener("click", async () => {
   if (activeTabId == null) return;
-  await chrome.tabs.sendMessage(activeTabId, { type: "SPF_START_ANNOTATE" }).catch(() => {
-    statusEl.textContent = "Can't annotate this page (reload the page and try again).";
-  });
-  window.close();
+  try {
+    await chrome.tabs.sendMessage(activeTabId, { type: "SPF_START_ANNOTATE" });
+    window.close();
+  } catch (err) {
+    statusEl.textContent = "Can't annotate this page - reload the page (F5) and try again.";
+  }
 });
 
 document.getElementById("viewAll").addEventListener("click", (e) => {
@@ -92,9 +89,6 @@ document.getElementById("viewAll").addEventListener("click", (e) => {
 });
 
 (async function init() {
-  const { spfAuthorName } = await chrome.storage.local.get(["spfAuthorName"]);
-  authorInput.value = spfAuthorName || "";
-
   const tab = await getActiveTab();
   activeTabId = tab?.id ?? null;
   activeTabUrl = tab?.url ?? null;

@@ -25,21 +25,6 @@ h1 {
   cursor: pointer;
 }
 
-.authorRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border-bottom: 1px solid #f0f0f0;
-  font-size: 12px;
-}
-
-.authorRow input {
-  flex: 1;
-  padding: 3px 6px;
-  font-size: 12px;
-}
-
 #status {
   padding: 6px 12px;
   font-size: 12px;

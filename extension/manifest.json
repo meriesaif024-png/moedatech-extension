@@ -7,6 +7,7 @@
   "host_permissions": [
     "https://ai.moedatech.net/*",
     "https://web-beta.moedatech.net/*",
+    "https://os.moedatech.net/*",
     "https://feedback-api-production-ed54.up.railway.app/*"
   ],
   "background": {
@@ -14,7 +15,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://ai.moedatech.net/*", "https://web-beta.moedatech.net/*"],
+      "matches": ["https://ai.moedatech.net/*", "https://web-beta.moedatech.net/*", "https://os.moedatech.net/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
