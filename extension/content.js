@@ -312,7 +312,6 @@
 
   async function showAnnotationForm(clientX, clientY, position, targetRect) {
     let selectedCategory = "bug";
-    let screenshotDataUrl = null;
 
     const form = document.createElement("div");
     form.style.cssText = `
@@ -350,28 +349,35 @@
       });
     });
 
-    chrome.runtime.sendMessage(
-      {
-        type: "SPF_CAPTURE_ELEMENT",
-        rect: { x: targetRect.left, y: targetRect.top, width: targetRect.width, height: targetRect.height },
-        dpr: window.devicePixelRatio || 1,
-      },
-      (response) => {
-        const preview = form.querySelector("#spf-shot-preview");
-        if (response?.dataUrl) {
-          screenshotDataUrl = response.dataUrl;
-          preview.innerHTML = `<img src="${response.dataUrl}" style="max-width:100%;border-radius:4px;border:1px solid #eee;" />`;
-        } else {
-          preview.textContent = `Screenshot unavailable${response?.error ? ": " + response.error : ""}`;
+    const saveBtn = form.querySelector("#spf-save");
+    saveBtn.disabled = true;
+
+    const captureDone = new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: "SPF_CAPTURE_ELEMENT",
+          rect: { x: targetRect.left, y: targetRect.top, width: targetRect.width, height: targetRect.height },
+          dpr: window.devicePixelRatio || 1,
+        },
+        (response) => {
+          const preview = form.querySelector("#spf-shot-preview");
+          if (response?.dataUrl) {
+            preview.innerHTML = `<img src="${response.dataUrl}" style="max-width:100%;border-radius:4px;border:1px solid #eee;" />`;
+          } else {
+            preview.textContent = `Screenshot unavailable${response?.error ? ": " + response.error : ""}`;
+          }
+          saveBtn.disabled = false;
+          resolve(response?.dataUrl || null);
         }
-      }
-    );
+      );
+    });
 
     form.querySelector("#spf-cancel").addEventListener("click", () => form.remove());
 
-    form.querySelector("#spf-save").addEventListener("click", async () => {
+    saveBtn.addEventListener("click", async () => {
       const text = form.querySelector("#spf-text").value.trim();
       const author = await getAuthor();
+      const screenshotDataUrl = await captureDone;
 
       chrome.runtime.sendMessage(
         {
