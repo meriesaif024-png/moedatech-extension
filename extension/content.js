@@ -11,6 +11,27 @@
   let pinsRoot = null;
   let annotating = false;
   let hoverBox = null;
+  let shadowRoot = null;
+
+  // The host page's own CSS (direction, fonts, button/textarea resets, z-index
+  // stacking) can otherwise bleed into anything we inject. A shadow root with
+  // `:host{all:initial}` cuts that inheritance so our UI always renders and
+  // behaves the same regardless of the page it's running on.
+  function getRoot() {
+    if (shadowRoot) return shadowRoot;
+    const host = document.createElement("div");
+    host.id = "spf-shadow-host";
+    document.documentElement.appendChild(host);
+    shadowRoot = host.attachShadow({ mode: "open" });
+    const style = document.createElement("style");
+    style.textContent = `
+      :host { all: initial; }
+      * { box-sizing: border-box; direction: ltr; font-family: system-ui, sans-serif; }
+      button { cursor: pointer; font-family: inherit; }
+    `;
+    shadowRoot.appendChild(style);
+    return shadowRoot;
+  }
 
   function buildSelector(el) {
     if (el.id) return `#${CSS.escape(el.id)}`;
@@ -55,11 +76,10 @@
   }
 
   function ensurePinsRoot() {
-    if (pinsRoot && document.documentElement.contains(pinsRoot)) return pinsRoot;
+    if (pinsRoot) return pinsRoot;
     pinsRoot = document.createElement("div");
-    pinsRoot.id = "spf-pins-root";
     pinsRoot.style.cssText = "position:absolute;top:0;left:0;width:0;height:0;z-index:2147483000;";
-    document.documentElement.appendChild(pinsRoot);
+    getRoot().appendChild(pinsRoot);
     return pinsRoot;
   }
 
@@ -83,7 +103,7 @@
     const root = ensurePinsRoot();
     root.innerHTML = "";
 
-    notes.forEach((note, i) => {
+    notes.forEach((note) => {
       const pos = positionForNote(note);
       const pin = document.createElement("div");
       const color = CATEGORY_COLORS[note.category] || CATEGORY_COLORS.other;
@@ -94,7 +114,6 @@
         transform:translate(-50%,-100%) rotate(45deg);
         background:${color};border:2px solid white;
         box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:pointer;
-        display:flex;align-items:center;justify-content:center;
         pointer-events:auto;${doneStyle}
       `;
       pin.title = note.text;
@@ -123,7 +142,7 @@
       position:fixed;left:${Math.min(rect.left, window.innerWidth - 260)}px;top:${rect.bottom + 6}px;
       width:240px;background:white;color:#1f1f1f;border-radius:8px;
       box-shadow:0 4px 16px rgba(0,0,0,0.25);padding:10px;
-      font:12px system-ui,sans-serif;z-index:2147483647;
+      font-size:12px;z-index:2147483647;
     `;
 
     const statusLabel = note.status === "done" ? "Done" : "Open";
@@ -160,7 +179,7 @@
       });
     });
 
-    document.documentElement.appendChild(card);
+    getRoot().appendChild(card);
     openPopover = card;
 
     setTimeout(() => {
@@ -190,7 +209,7 @@
     hoverBox = document.createElement("div");
     hoverBox.style.cssText =
       "position:fixed;pointer-events:none;border:2px solid #1a73e8;background:rgba(26,115,232,0.12);z-index:2147483646;display:none;";
-    document.documentElement.appendChild(hoverBox);
+    getRoot().appendChild(hoverBox);
 
     document.addEventListener("mousemove", onHoverMove, true);
     document.addEventListener("click", onAnnotateClick, true);
@@ -248,26 +267,26 @@
 
     const form = document.createElement("div");
     form.style.cssText = `
-      position:fixed;left:${Math.min(clientX, window.innerWidth - 260)}px;top:${Math.min(clientY, window.innerHeight - 260)}px;
+      position:fixed;left:${Math.min(clientX, window.innerWidth - 260)}px;top:${Math.min(clientY, window.innerHeight - 300)}px;
       width:240px;background:white;color:#1f1f1f;border-radius:8px;
       box-shadow:0 4px 16px rgba(0,0,0,0.3);padding:10px;
-      font:12px system-ui,sans-serif;z-index:2147483647;
+      font-size:12px;z-index:2147483647;
     `;
 
     const categoryButtonsHtml = CATEGORIES.map(
-      (c) => `<button type="button" data-category="${c.key}" class="spf-cat-btn" style="flex:1;padding:5px 0;border:1px solid ${CATEGORY_COLORS[c.key]};background:${c.key === selectedCategory ? CATEGORY_COLORS[c.key] : "white"};color:${c.key === selectedCategory ? "white" : CATEGORY_COLORS[c.key]};border-radius:4px;cursor:pointer;">${c.label}</button>`
+      (c) => `<button type="button" data-category="${c.key}" class="spf-cat-btn" style="flex:1;padding:5px 0;border:1px solid ${CATEGORY_COLORS[c.key]};background:${c.key === selectedCategory ? CATEGORY_COLORS[c.key] : "white"};color:${c.key === selectedCategory ? "white" : CATEGORY_COLORS[c.key]};border-radius:4px;">${c.label}</button>`
     ).join("");
 
     form.innerHTML = `
       <div style="display:flex;gap:4px;margin-bottom:6px;">${categoryButtonsHtml}</div>
       <div id="spf-shot-preview" style="margin-bottom:6px;font-size:11px;color:#888;">Capturing screenshot&hellip;</div>
-      <textarea id="spf-text" placeholder="What's the note?" style="width:100%;height:60px;margin-bottom:6px;box-sizing:border-box;padding:4px;"></textarea>
+      <textarea id="spf-text" placeholder="What's the note?" style="width:100%;height:60px;margin-bottom:6px;padding:4px;font-size:12px;"></textarea>
       <div style="display:flex;gap:6px;">
-        <button id="spf-save" style="flex:1;">Save</button>
-        <button id="spf-cancel" style="flex:1;">Cancel</button>
+        <button id="spf-save" style="flex:1;padding:6px 0;">Save</button>
+        <button id="spf-cancel" style="flex:1;padding:6px 0;">Cancel</button>
       </div>
     `;
-    document.documentElement.appendChild(form);
+    getRoot().appendChild(form);
     form.querySelector("#spf-text").focus();
 
     form.querySelectorAll(".spf-cat-btn").forEach((btn) => {
@@ -294,7 +313,7 @@
           screenshotDataUrl = response.dataUrl;
           preview.innerHTML = `<img src="${response.dataUrl}" style="max-width:100%;border-radius:4px;border:1px solid #eee;" />`;
         } else {
-          preview.textContent = "Screenshot unavailable";
+          preview.textContent = `Screenshot unavailable${response?.error ? ": " + response.error : ""}`;
         }
       }
     );
