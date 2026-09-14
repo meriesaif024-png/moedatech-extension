@@ -10,6 +10,8 @@
   let annotating = false;
   let hoverBox = null;
   let shadowRoot = null;
+  let markersRoot = null;
+  let currentNotes = [];
 
   // The host page's own CSS (direction, fonts, button/textarea resets, z-index
   // stacking) can otherwise bleed into anything we inject. A shadow root with
@@ -63,6 +65,139 @@
     return new Promise((resolve) => {
       chrome.storage.local.get(["spfAuthorName"], (result) => resolve(result.spfAuthorName || "Anonymous"));
     });
+  }
+
+  function fetchNotes() {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: "SPF_GET_NOTES", url: location.href }, (response) => {
+        resolve(response?.notes || []);
+      });
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str || "";
+    return div.innerHTML;
+  }
+
+  function ensureMarkersRoot() {
+    if (markersRoot) return markersRoot;
+    markersRoot = document.createElement("div");
+    markersRoot.style.cssText = "position:absolute;top:0;left:0;width:0;height:0;z-index:2147483000;";
+    getRoot().appendChild(markersRoot);
+    return markersRoot;
+  }
+
+  function positionForNote(note) {
+    if (note.selector) {
+      const el = document.querySelector(note.selector);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        return { x: rect.left + window.scrollX, y: rect.top + window.scrollY };
+      }
+    }
+    const docEl = document.documentElement;
+    return {
+      x: ((note.x_percent || 0) / 100) * docEl.scrollWidth,
+      y: ((note.y_percent || 0) / 100) * docEl.scrollHeight,
+    };
+  }
+
+  function renderMarkers(notes) {
+    currentNotes = notes;
+    const root = ensureMarkersRoot();
+    root.innerHTML = "";
+
+    notes.forEach((note) => {
+      const pos = positionForNote(note);
+      const color = CATEGORY_COLORS[note.category] || CATEGORY_COLORS.other;
+      const marker = document.createElement("div");
+
+      if (note.screenshot) {
+        marker.style.cssText = `
+          position:absolute;left:${pos.x}px;top:${pos.y}px;
+          width:48px;height:48px;border-radius:6px;overflow:hidden;
+          border:2px solid ${color};box-shadow:0 1px 6px rgba(0,0,0,0.4);
+          cursor:pointer;pointer-events:auto;background:white;
+          transform:translate(0,-100%);
+        `;
+        marker.innerHTML = `<img src="${note.screenshot}" style="width:100%;height:100%;object-fit:cover;" />`;
+      } else {
+        marker.style.cssText = `
+          position:absolute;left:${pos.x}px;top:${pos.y}px;
+          width:22px;height:22px;border-radius:50% 50% 50% 0;
+          transform:translate(-50%,-100%) rotate(45deg);
+          background:${color};border:2px solid white;
+          box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:pointer;
+          pointer-events:auto;
+        `;
+      }
+      marker.title = note.text || note.category;
+
+      marker.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        toggleNotePopover(marker, note);
+      });
+
+      root.appendChild(marker);
+    });
+  }
+
+  let openPopover = null;
+
+  function toggleNotePopover(marker, note) {
+    if (openPopover) {
+      openPopover.remove();
+      openPopover = null;
+    }
+
+    const rect = marker.getBoundingClientRect();
+    const card = document.createElement("div");
+    card.style.cssText = `
+      position:fixed;left:${Math.min(rect.left, window.innerWidth - 260)}px;top:${rect.bottom + 6}px;
+      width:240px;background:white;color:#1f1f1f;border-radius:8px;
+      box-shadow:0 4px 16px rgba(0,0,0,0.25);padding:10px;
+      font-size:12px;z-index:2147483647;
+    `;
+
+    const screenshotHtml = note.screenshot
+      ? `<img src="${note.screenshot}" style="max-width:100%;border-radius:4px;border:1px solid #eee;margin-bottom:6px;" />`
+      : "";
+    card.innerHTML = `
+      <div style="font-weight:600;text-transform:capitalize;margin-bottom:4px;">${note.category}</div>
+      ${screenshotHtml}
+      <div style="margin-bottom:6px;white-space:pre-wrap;">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</div>
+      <div style="color:#666;font-size:11px;margin-bottom:8px;">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</div>
+      <div style="display:flex;gap:6px;">
+        <button data-action="delete" style="flex:1;">Delete</button>
+      </div>
+    `;
+
+    card.querySelector('[data-action="delete"]').addEventListener("click", (e) => {
+      e.stopPropagation();
+      chrome.runtime.sendMessage({ type: "SPF_DELETE_NOTE", id: note.id }, async () => {
+        card.remove();
+        openPopover = null;
+        renderMarkers(await fetchNotes());
+      });
+    });
+
+    getRoot().appendChild(card);
+    openPopover = card;
+
+    setTimeout(() => {
+      document.addEventListener(
+        "click",
+        function closeOnce() {
+          card.remove();
+          if (openPopover === card) openPopover = null;
+          document.removeEventListener("click", closeOnce);
+        },
+        { once: true }
+      );
+    }, 0);
   }
 
   let dragStart = null;
@@ -271,8 +406,9 @@
             screenshot: screenshotDataUrl,
           },
         },
-        () => {
+        async () => {
           form.remove();
+          renderMarkers(await fetchNotes());
         }
       );
     });
@@ -283,4 +419,8 @@
       startAnnotate();
     }
   });
+
+  window.addEventListener("resize", () => renderMarkers(currentNotes));
+
+  fetchNotes().then(renderMarkers);
 })();
