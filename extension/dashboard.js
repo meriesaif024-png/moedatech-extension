@@ -51,7 +51,7 @@ function render(notes) {
       div.innerHTML = `
         <span class="badge ${note.category}">${note.category}</span>
         <span class="noteMeta">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</span>
-        <span class="noteText">${escapeHtml(note.text)}</span>
+        <span class="noteText">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</span>
         ${screenshotHtml}
         <div class="noteActions">
           <button data-action="toggle" data-id="${note.id}" data-status="${note.status}">${note.status === "done" ? "Reopen" : "Mark done"}</button>

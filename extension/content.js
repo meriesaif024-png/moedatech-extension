@@ -152,7 +152,7 @@
     card.innerHTML = `
       <div style="font-weight:600;text-transform:capitalize;margin-bottom:4px;">${note.category} &middot; ${statusLabel}</div>
       ${screenshotHtml}
-      <div style="margin-bottom:6px;white-space:pre-wrap;">${escapeHtml(note.text)}</div>
+      <div style="margin-bottom:6px;white-space:pre-wrap;">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</div>
       <div style="color:#666;font-size:11px;margin-bottom:8px;">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</div>
       <div style="display:flex;gap:6px;">
         <button data-action="toggle" style="flex:1;">${note.status === "done" ? "Reopen" : "Mark done"}</button>
@@ -384,7 +384,6 @@
 
     form.querySelector("#spf-save").addEventListener("click", async () => {
       const text = form.querySelector("#spf-text").value.trim();
-      if (!text) return;
       const author = await getAuthor();
 
       chrome.runtime.sendMessage(

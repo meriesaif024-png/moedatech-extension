@@ -28,7 +28,7 @@ function renderNotes(notes) {
       : "";
     li.innerHTML = `
       <span class="badge ${note.category}">${note.category}</span>
-      <span class="noteText">${escapeHtml(note.text)}</span>
+      <span class="noteText">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</span>
       ${screenshotHtml}
       <span class="noteMeta">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</span>
       <div class="noteActions">

@@ -57,7 +57,7 @@ app.get("/api/notes", async (req, res) => {
 
 app.post("/api/notes", async (req, res) => {
   const { url, pageTitle, selector, xPercent, yPercent, category, text, author, screenshot } = req.body;
-  if (!url || !text) return res.status(400).json({ error: "url and text are required" });
+  if (!url) return res.status(400).json({ error: "url is required" });
 
   const result = await pool.query(
     `INSERT INTO notes (url, page_title, selector, x_percent, y_percent, category, text, author, screenshot)
@@ -69,7 +69,7 @@ app.post("/api/notes", async (req, res) => {
       xPercent ?? null,
       yPercent ?? null,
       category || "other",
-      text,
+      text || "",
       author || "Anonymous",
       screenshot || null,
     ]
