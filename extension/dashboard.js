@@ -50,7 +50,6 @@ function render(notes) {
         <span class="noteText">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</span>
         ${screenshotHtml}
         <div class="noteActions">
-          <button data-action="goto" data-id="${note.id}" data-url="${escapeHtml(note.url)}">Go to spot</button>
           <button data-action="delete" data-id="${note.id}">Delete</button>
         </div>
       `;
@@ -64,12 +63,6 @@ groupsEl.addEventListener("click", async (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
   const id = btn.dataset.id;
-
-  if (btn.dataset.action === "goto") {
-    await chrome.storage.local.set({ spfPendingScroll: { noteId: Number(id), url: btn.dataset.url } });
-    chrome.tabs.create({ url: btn.dataset.url });
-    return;
-  }
 
   if (btn.dataset.action === "delete") {
     await sendMessage({ type: "SPF_DELETE_NOTE", id });
