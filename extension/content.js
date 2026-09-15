@@ -86,6 +86,52 @@
     });
   }
 
+  function fetchTeamMembers() {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: "SPF_GET_TEAM_MEMBERS" }, (response) => {
+        resolve(response?.members || []);
+      });
+    });
+  }
+
+  const ADD_PERSON_VALUE = "__add_person__";
+
+  function assigneeOptionsHtml(members, selected) {
+    const options = ['<option value="">Unassigned</option>'];
+    for (const m of members) {
+      options.push(`<option value="${escapeHtml(m.name)}" ${m.name === selected ? "selected" : ""}>${escapeHtml(m.name)}</option>`);
+    }
+    options.push(`<option value="${ADD_PERSON_VALUE}">+ Add new person&hellip;</option>`);
+    return options.join("");
+  }
+
+  // Populates a <select> with the shared team list and handles the
+  // "+ Add new person" option by prompting for a name and saving it to the
+  // shared backend so it shows up for everyone from then on.
+  async function wireAssigneeSelect(select, currentValue, onAssign) {
+    select.addEventListener("click", (e) => e.stopPropagation());
+    const members = await fetchTeamMembers();
+    select.innerHTML = assigneeOptionsHtml(members, currentValue);
+    select.addEventListener("change", async () => {
+      if (select.value === ADD_PERSON_VALUE) {
+        const name = window.prompt("Add a new team member:");
+        if (!name || !name.trim()) {
+          select.value = currentValue || "";
+          return;
+        }
+        const trimmed = name.trim();
+        await new Promise((resolve) =>
+          chrome.runtime.sendMessage({ type: "SPF_ADD_TEAM_MEMBER", name: trimmed }, resolve)
+        );
+        const refreshed = await fetchTeamMembers();
+        select.innerHTML = assigneeOptionsHtml(refreshed, trimmed);
+        onAssign(trimmed);
+        return;
+      }
+      onAssign(select.value || null);
+    });
+  }
+
   function escapeHtml(str) {
     const div = document.createElement("div");
     div.textContent = str || "";
@@ -187,11 +233,20 @@
       <div style="margin-bottom:6px;white-space:pre-wrap;">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</div>
       <div style="color:#666;font-size:11px;margin-bottom:8px;">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</div>
       ${completedHtml}
+      <label style="display:block;font-size:11px;color:#666;margin-bottom:2px;">Assigned to:</label>
+      <select data-role="assignee" style="width:100%;margin-bottom:8px;padding:4px;font-size:12px;">
+        <option>Loading&hellip;</option>
+      </select>
       <div style="display:flex;gap:6px;">
         <button data-action="toggle" style="flex:1;">${note.status === "done" ? "Reopen" : "Mark complete"}</button>
         <button data-action="delete" style="flex:1;">Delete</button>
       </div>
     `;
+
+    wireAssigneeSelect(card.querySelector('[data-role="assignee"]'), note.assigned_to, (assignedTo) => {
+      chrome.runtime.sendMessage({ type: "SPF_ASSIGN_NOTE", id: note.id, assignedTo });
+      note.assigned_to = assignedTo;
+    });
 
     card.querySelector('[data-action="open-image"]')?.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -386,6 +441,9 @@
       <div style="display:flex;gap:4px;margin-bottom:6px;">${categoryButtonsHtml}</div>
       <div id="spf-shot-preview" style="margin-bottom:6px;font-size:11px;color:#888;">Capturing screenshot&hellip;</div>
       <textarea id="spf-text" placeholder="What's the note?" style="width:100%;height:60px;margin-bottom:6px;padding:4px;font-size:12px;"></textarea>
+      <select id="spf-assignee" style="width:100%;margin-bottom:6px;padding:4px;font-size:12px;">
+        <option>Loading&hellip;</option>
+      </select>
       <div style="display:flex;gap:6px;">
         <button id="spf-save" style="flex:1;padding:6px 0;">Save</button>
         <button id="spf-cancel" style="flex:1;padding:6px 0;">Cancel</button>
@@ -404,6 +462,11 @@
           b.style.color = active ? "white" : color;
         });
       });
+    });
+
+    let selectedAssignee = null;
+    wireAssigneeSelect(form.querySelector("#spf-assignee"), null, (assignedTo) => {
+      selectedAssignee = assignedTo;
     });
 
     const saveBtn = form.querySelector("#spf-save");
@@ -449,6 +512,7 @@
             text,
             author,
             screenshot: screenshotDataUrl,
+            assignedTo: selectedAssignee,
           },
         },
         async () => {

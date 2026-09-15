@@ -13,6 +13,39 @@ function sendMessage(message) {
   return new Promise((resolve) => chrome.runtime.sendMessage(message, resolve));
 }
 
+const ADD_PERSON_VALUE = "__add_person__";
+
+function assigneeOptionsHtml(members, selected) {
+  const options = ['<option value="">Unassigned</option>'];
+  for (const m of members) {
+    options.push(`<option value="${escapeHtml(m.name)}" ${m.name === selected ? "selected" : ""}>${escapeHtml(m.name)}</option>`);
+  }
+  options.push(`<option value="${ADD_PERSON_VALUE}">+ Add new person&hellip;</option>`);
+  return options.join("");
+}
+
+async function wireAssigneeSelect(select, currentValue, onAssign) {
+  const membersResponse = await sendMessage({ type: "SPF_GET_TEAM_MEMBERS" });
+  const members = membersResponse?.members || [];
+  select.innerHTML = assigneeOptionsHtml(members, currentValue);
+  select.addEventListener("change", async () => {
+    if (select.value === ADD_PERSON_VALUE) {
+      const name = window.prompt("Add a new team member:");
+      if (!name || !name.trim()) {
+        select.value = currentValue || "";
+        return;
+      }
+      const trimmed = name.trim();
+      await sendMessage({ type: "SPF_ADD_TEAM_MEMBER", name: trimmed });
+      const refreshed = await sendMessage({ type: "SPF_GET_TEAM_MEMBERS" });
+      select.innerHTML = assigneeOptionsHtml(refreshed?.members || [], trimmed);
+      onAssign(trimmed);
+      return;
+    }
+    onAssign(select.value || null);
+  });
+}
+
 function renderNotes(notes) {
   noteListEl.innerHTML = "";
   if (!notes.length) {
@@ -36,12 +69,20 @@ function renderNotes(notes) {
       ${screenshotHtml}
       <span class="noteMeta">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</span>
       ${completedHtml}
+      <label style="display:block;font-size:11px;color:#666;margin-top:4px;">Assigned to:</label>
+      <select class="assigneeSelect" data-id="${note.id}" style="width:100%;padding:3px;font-size:12px;margin-top:2px;">
+        <option>Loading&hellip;</option>
+      </select>
       <div class="noteActions">
         <button data-action="toggle" data-id="${note.id}" data-status="${note.status}">${note.status === "done" ? "Reopen" : "Mark complete"}</button>
         <button data-action="delete" data-id="${note.id}">Delete</button>
       </div>
     `;
     noteListEl.appendChild(li);
+
+    wireAssigneeSelect(li.querySelector(".assigneeSelect"), note.assigned_to, (assignedTo) => {
+      sendMessage({ type: "SPF_ASSIGN_NOTE", id: note.id, assignedTo });
+    });
   }
 }
 

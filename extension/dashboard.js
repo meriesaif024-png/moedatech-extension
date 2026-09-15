@@ -24,11 +24,45 @@ async function load() {
   renderFiltered();
 }
 
+const ADD_PERSON_VALUE = "__add_person__";
+
+function assigneeOptionsHtml(members, selected) {
+  const options = ['<option value="">Unassigned</option>'];
+  for (const m of members) {
+    options.push(`<option value="${escapeHtml(m.name)}" ${m.name === selected ? "selected" : ""}>${escapeHtml(m.name)}</option>`);
+  }
+  options.push(`<option value="${ADD_PERSON_VALUE}">+ Add new person&hellip;</option>`);
+  return options.join("");
+}
+
+async function wireAssigneeSelect(select, currentValue, onAssign) {
+  const membersResponse = await sendMessage({ type: "SPF_GET_TEAM_MEMBERS" });
+  const members = membersResponse?.members || [];
+  select.innerHTML = assigneeOptionsHtml(members, currentValue);
+  select.addEventListener("change", async () => {
+    if (select.value === ADD_PERSON_VALUE) {
+      const name = window.prompt("Add a new team member:");
+      if (!name || !name.trim()) {
+        select.value = currentValue || "";
+        return;
+      }
+      const trimmed = name.trim();
+      await sendMessage({ type: "SPF_ADD_TEAM_MEMBER", name: trimmed });
+      const refreshed = await sendMessage({ type: "SPF_GET_TEAM_MEMBERS" });
+      select.innerHTML = assigneeOptionsHtml(refreshed?.members || [], trimmed);
+      onAssign(trimmed);
+      return;
+    }
+    onAssign(select.value || null);
+  });
+}
+
 function populatePersonFilter(notes) {
   const people = new Set();
   for (const note of notes) {
     if (note.author) people.add(note.author);
     if (note.completed_by) people.add(note.completed_by);
+    if (note.assigned_to) people.add(note.assigned_to);
   }
   const sorted = Array.from(people).sort((a, b) => a.localeCompare(b));
   const previous = personFilterEl.value;
@@ -45,7 +79,9 @@ function populatePersonFilter(notes) {
 
 function renderFiltered() {
   const person = personFilterEl.value;
-  const filtered = person ? allNotes.filter((n) => n.author === person || n.completed_by === person) : allNotes;
+  const filtered = person
+    ? allNotes.filter((n) => n.author === person || n.completed_by === person || n.assigned_to === person)
+    : allNotes;
   render(filtered);
 }
 
@@ -84,12 +120,20 @@ function render(notes) {
         <span class="noteText">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</span>
         ${screenshotHtml}
         ${completedHtml}
+        <label style="display:block;font-size:11px;color:#666;margin-top:4px;">Assigned to:</label>
+        <select class="assigneeSelect" data-id="${note.id}" style="padding:3px;font-size:12px;margin:2px 0 6px;">
+          <option>Loading&hellip;</option>
+        </select>
         <div class="noteActions">
           <button data-action="toggle" data-id="${note.id}" data-status="${note.status}">${note.status === "done" ? "Reopen" : "Mark complete"}</button>
           <button data-action="delete" data-id="${note.id}">Delete</button>
         </div>
       `;
       group.appendChild(div);
+
+      wireAssigneeSelect(div.querySelector(".assigneeSelect"), note.assigned_to, (assignedTo) => {
+        sendMessage({ type: "SPF_ASSIGN_NOTE", id: note.id, assignedTo });
+      });
     }
     groupsEl.appendChild(group);
   }
