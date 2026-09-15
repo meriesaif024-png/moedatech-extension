@@ -46,7 +46,7 @@ function render(notes) {
         : "";
       const completedHtml =
         note.status === "done"
-          ? `<span class="noteMeta">&#10003; Completed by ${escapeHtml(note.completed_by || "Anonymous")} &middot; ${new Date(note.completed_at).toLocaleString()}</span>`
+          ? `<span class="noteMeta">&#10003; Completed by <span style="color:#188038;font-size:15px;font-weight:700;">${escapeHtml(note.completed_by || "Anonymous")}</span> &middot; ${new Date(note.completed_at).toLocaleString()}</span>`
           : "";
       div.innerHTML = `
         <span class="badge ${note.category}">${note.category}</span>

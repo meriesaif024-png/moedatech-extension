@@ -179,7 +179,7 @@
       : "";
     const completedHtml =
       note.status === "done"
-        ? `<div style="color:#188038;font-size:11px;margin-bottom:8px;">&#10003; Completed by ${escapeHtml(note.completed_by || "Anonymous")} &middot; ${new Date(note.completed_at).toLocaleString()}</div>`
+        ? `<div style="color:#666;font-size:11px;margin-bottom:8px;">&#10003; Completed by <span style="color:#188038;font-size:15px;font-weight:700;">${escapeHtml(note.completed_by || "Anonymous")}</span> &middot; ${new Date(note.completed_at).toLocaleString()}</div>`
         : "";
     card.innerHTML = `
       <div style="font-weight:600;text-transform:capitalize;margin-bottom:4px;">${note.category}</div>
