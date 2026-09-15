@@ -64,6 +64,56 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+const COMPLETION_CHECK_ALARM = "spfCheckCompletions";
+const COMPLETION_CHECK_MINUTES = 2;
+
+chrome.alarms.create(COMPLETION_CHECK_ALARM, { periodInMinutes: COMPLETION_CHECK_MINUTES });
+
+chrome.runtime.onInstalled.addListener(async () => {
+  const { spfLastCheckedAt } = await chrome.storage.local.get(["spfLastCheckedAt"]);
+  if (!spfLastCheckedAt) {
+    // Don't notify for everything already completed before the extension was installed.
+    await chrome.storage.local.set({ spfLastCheckedAt: new Date().toISOString() });
+  }
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === COMPLETION_CHECK_ALARM) checkForCompletions();
+});
+
+async function checkForCompletions() {
+  const { spfLastCheckedAt } = await chrome.storage.local.get(["spfLastCheckedAt"]);
+  const since = spfLastCheckedAt ? new Date(spfLastCheckedAt) : new Date(0);
+  const checkedAt = new Date().toISOString();
+
+  let notes;
+  try {
+    notes = await api("/api/notes");
+  } catch {
+    return;
+  }
+
+  const newlyCompleted = notes.filter(
+    (n) => n.status === "done" && n.completed_at && new Date(n.completed_at) > since
+  );
+
+  for (const note of newlyCompleted) {
+    chrome.notifications.create(`spf-note-${note.id}`, {
+      type: "basic",
+      iconUrl: "icon128.png",
+      title: `${note.completed_by || "Someone"} completed a "${note.category}" note`,
+      message: note.text || "(no note)",
+      contextMessage: note.page_title || note.url,
+    });
+  }
+
+  await chrome.storage.local.set({ spfLastCheckedAt: checkedAt });
+}
+
+chrome.notifications.onClicked.addListener(() => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
+});
+
 const MAX_SCREENSHOT_DIMENSION = 1400;
 
 // Captures the whole visible page (not just the clicked element) and marks

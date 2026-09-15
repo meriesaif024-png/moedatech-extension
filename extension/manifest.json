@@ -3,7 +3,12 @@
   "name": "Moedatech Detector",
   "version": "2.0.0",
   "description": "Leave feedback notes pinned to specific elements on the team's web apps, shared with the whole team.",
-  "permissions": ["tabs", "storage", "activeTab"],
+  "permissions": ["tabs", "storage", "activeTab", "notifications", "alarms"],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "host_permissions": [
     "https://ai.moedatech.net/*",
     "https://web-beta.moedatech.net/*",
@@ -22,6 +27,11 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Moedatech Detector"
+    "default_title": "Moedatech Detector",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   }
 }
