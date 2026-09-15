@@ -3,7 +3,7 @@
   "name": "Moedatech Detector",
   "version": "2.0.0",
   "description": "Leave feedback notes pinned to specific elements on the team's web apps, shared with the whole team.",
-  "permissions": ["tabs", "storage"],
+  "permissions": ["tabs", "storage", "activeTab"],
   "host_permissions": [
     "https://ai.moedatech.net/*",
     "https://web-beta.moedatech.net/*",
