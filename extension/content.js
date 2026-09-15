@@ -229,7 +229,21 @@
     const yPercent = ((targetRect.top + window.scrollY) / docEl.scrollHeight) * 100;
 
     stopAnnotate();
-    showAnnotationForm(e.clientX, e.clientY, { selector, xPercent, yPercent }, targetRect);
+
+    // Capture the screenshot with none of our own UI on screen yet, so the
+    // note-creation form itself never ends up in the shot.
+    const captureResponse = await new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: "SPF_CAPTURE_ELEMENT",
+          rect: { x: targetRect.left, y: targetRect.top, width: targetRect.width, height: targetRect.height },
+          dpr: window.devicePixelRatio || 1,
+        },
+        resolve
+      );
+    });
+
+    showAnnotationForm(e.clientX, e.clientY, { selector, xPercent, yPercent }, captureResponse);
   }
 
   const CATEGORIES = [
@@ -239,8 +253,9 @@
     { key: "change", label: "Change" },
   ];
 
-  async function showAnnotationForm(clientX, clientY, position, targetRect) {
+  async function showAnnotationForm(clientX, clientY, position, captureResponse) {
     let selectedCategory = "bug";
+    const screenshotDataUrl = captureResponse?.dataUrl || null;
 
     const form = document.createElement("div");
     form.style.cssText = `
@@ -254,9 +269,13 @@
       (c) => `<button type="button" data-category="${c.key}" class="spf-cat-btn" style="flex:1;padding:5px 0;border:1px solid ${CATEGORY_COLORS[c.key]};background:${c.key === selectedCategory ? CATEGORY_COLORS[c.key] : "white"};color:${c.key === selectedCategory ? "white" : CATEGORY_COLORS[c.key]};border-radius:4px;">${c.label}</button>`
     ).join("");
 
+    const previewHtml = screenshotDataUrl
+      ? `<img src="${screenshotDataUrl}" style="max-width:100%;border-radius:4px;border:1px solid #eee;" />`
+      : `<div style="font-size:11px;color:#888;">Screenshot unavailable${captureResponse?.error ? ": " + captureResponse.error : ""}</div>`;
+
     form.innerHTML = `
       <div style="display:flex;gap:4px;margin-bottom:6px;">${categoryButtonsHtml}</div>
-      <div id="spf-shot-preview" style="margin-bottom:6px;font-size:11px;color:#888;">Capturing screenshot&hellip;</div>
+      <div id="spf-shot-preview" style="margin-bottom:6px;">${previewHtml}</div>
       <textarea id="spf-text" placeholder="What's the note?" style="width:100%;height:60px;margin-bottom:6px;padding:4px;font-size:12px;"></textarea>
       <select id="spf-assignee" style="width:100%;margin-bottom:6px;padding:4px;font-size:12px;">
         <option>Loading&hellip;</option>
@@ -287,34 +306,12 @@
     });
 
     const saveBtn = form.querySelector("#spf-save");
-    saveBtn.disabled = true;
-
-    const captureDone = new Promise((resolve) => {
-      chrome.runtime.sendMessage(
-        {
-          type: "SPF_CAPTURE_ELEMENT",
-          rect: { x: targetRect.left, y: targetRect.top, width: targetRect.width, height: targetRect.height },
-          dpr: window.devicePixelRatio || 1,
-        },
-        (response) => {
-          const preview = form.querySelector("#spf-shot-preview");
-          if (response?.dataUrl) {
-            preview.innerHTML = `<img src="${response.dataUrl}" style="max-width:100%;border-radius:4px;border:1px solid #eee;" />`;
-          } else {
-            preview.textContent = `Screenshot unavailable${response?.error ? ": " + response.error : ""}`;
-          }
-          saveBtn.disabled = false;
-          resolve(response?.dataUrl || null);
-        }
-      );
-    });
 
     form.querySelector("#spf-cancel").addEventListener("click", () => form.remove());
 
     saveBtn.addEventListener("click", async () => {
       const text = form.querySelector("#spf-text").value.trim();
       const author = await getAuthor();
-      const screenshotDataUrl = await captureDone;
 
       chrome.runtime.sendMessage(
         {
