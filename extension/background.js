@@ -54,33 +54,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-const MAX_SCREENSHOT_DIMENSION = 900;
+const MAX_SCREENSHOT_DIMENSION = 1400;
 
+// Captures the whole visible page (not just the clicked element) and marks
+// the chosen spot with a shaded overlay + border, so whoever picks up the
+// note sees the full context and doesn't have to hunt for where it was.
 async function captureElement(windowId, rect, dpr) {
   const fullDataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: "png" });
   const blob = await (await fetch(fullDataUrl)).blob();
   const bitmap = await createImageBitmap(blob);
 
   const scale = dpr || 1;
-  const sx = Math.max(0, rect.x * scale);
-  const sy = Math.max(0, rect.y * scale);
-  const sw = Math.min(rect.width * scale, bitmap.width - sx);
-  const sh = Math.min(rect.height * scale, bitmap.height - sy);
-  if (sw <= 0 || sh <= 0) return null;
-
-  const shrink = Math.min(1, MAX_SCREENSHOT_DIMENSION / Math.max(sw, sh));
-  const outW = Math.round(sw * shrink);
-  const outH = Math.round(sh * shrink);
+  const shrink = Math.min(1, MAX_SCREENSHOT_DIMENSION / Math.max(bitmap.width, bitmap.height));
+  const outW = Math.round(bitmap.width * shrink);
+  const outH = Math.round(bitmap.height * shrink);
 
   const canvas = new OffscreenCanvas(outW, outH);
   const ctx = canvas.getContext("2d");
-  ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, outW, outH);
+  ctx.drawImage(bitmap, 0, 0, bitmap.width, bitmap.height, 0, 0, outW, outH);
 
-  const croppedBlob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.85 });
+  const markScale = shrink * scale;
+  const markX = rect.x * markScale;
+  const markY = rect.y * markScale;
+  const markW = Math.max(rect.width * markScale, 4);
+  const markH = Math.max(rect.height * markScale, 4);
+
+  ctx.fillStyle = "rgba(255, 60, 0, 0.3)";
+  ctx.fillRect(markX, markY, markW, markH);
+  ctx.strokeStyle = "#ff3c00";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(markX, markY, markW, markH);
+
+  const outputBlob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.85 });
   return await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
     reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(croppedBlob);
+    reader.readAsDataURL(outputBlob);
   });
 }

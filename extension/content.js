@@ -114,25 +114,14 @@
       const color = CATEGORY_COLORS[note.category] || CATEGORY_COLORS.other;
       const marker = document.createElement("div");
 
-      if (note.screenshot) {
-        marker.style.cssText = `
-          position:absolute;left:${pos.x}px;top:${pos.y}px;
-          width:48px;height:48px;border-radius:6px;overflow:hidden;
-          border:2px solid ${color};box-shadow:0 1px 6px rgba(0,0,0,0.4);
-          cursor:pointer;pointer-events:auto;background:white;
-          transform:translate(0,-100%);
-        `;
-        marker.innerHTML = `<img src="${note.screenshot}" style="width:100%;height:100%;object-fit:cover;" />`;
-      } else {
-        marker.style.cssText = `
-          position:absolute;left:${pos.x}px;top:${pos.y}px;
-          width:22px;height:22px;border-radius:50% 50% 50% 0;
-          transform:translate(-50%,-100%) rotate(45deg);
-          background:${color};border:2px solid white;
-          box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:pointer;
-          pointer-events:auto;
-        `;
-      }
+      marker.style.cssText = `
+        position:absolute;left:${pos.x}px;top:${pos.y}px;
+        width:22px;height:22px;border-radius:50% 50% 50% 0;
+        transform:translate(-50%,-100%) rotate(45deg);
+        background:${color};border:2px solid white;
+        box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:pointer;
+        pointer-events:auto;
+      `;
       marker.title = note.text || note.category;
 
       marker.addEventListener("click", (e) => {
