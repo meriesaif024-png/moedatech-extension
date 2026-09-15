@@ -1,4 +1,7 @@
 const groupsEl = document.getElementById("groups");
+const personFilterEl = document.getElementById("personFilter");
+
+let allNotes = [];
 
 function sendMessage(message) {
   return new Promise((resolve) => chrome.runtime.sendMessage(message, resolve));
@@ -16,7 +19,34 @@ async function load() {
     groupsEl.innerHTML = `<div class="empty">Error loading notes: ${escapeHtml(response.error)}</div>`;
     return;
   }
-  render(response?.notes || []);
+  allNotes = response?.notes || [];
+  populatePersonFilter(allNotes);
+  renderFiltered();
+}
+
+function populatePersonFilter(notes) {
+  const people = new Set();
+  for (const note of notes) {
+    if (note.author) people.add(note.author);
+    if (note.completed_by) people.add(note.completed_by);
+  }
+  const sorted = Array.from(people).sort((a, b) => a.localeCompare(b));
+  const previous = personFilterEl.value;
+
+  personFilterEl.innerHTML = '<option value="">All people</option>';
+  for (const name of sorted) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    personFilterEl.appendChild(opt);
+  }
+  if (sorted.includes(previous)) personFilterEl.value = previous;
+}
+
+function renderFiltered() {
+  const person = personFilterEl.value;
+  const filtered = person ? allNotes.filter((n) => n.author === person || n.completed_by === person) : allNotes;
+  render(filtered);
 }
 
 function render(notes) {
@@ -110,5 +140,6 @@ groupsEl.addEventListener("click", async (e) => {
 });
 
 document.getElementById("refresh").addEventListener("click", load);
+personFilterEl.addEventListener("change", renderFiltered);
 
 load();
