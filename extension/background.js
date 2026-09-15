@@ -1,6 +1,6 @@
 importScripts("config.js");
 
-const API_BASE = "https://feedback-api-production-ed54.up.railway.app";
+const API_BASE = "https://feedback-api-production-8bc5.up.railway.app";
 
 async function api(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {

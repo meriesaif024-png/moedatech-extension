@@ -13,7 +13,7 @@
     "https://ai.moedatech.net/*",
     "https://web-beta.moedatech.net/*",
     "https://os.moedatech.net/*",
-    "https://feedback-api-production-ed54.up.railway.app/*"
+    "https://feedback-api-production-8bc5.up.railway.app/*"
   ],
   "background": {
     "service_worker": "background.js"
