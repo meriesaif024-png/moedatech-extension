@@ -23,7 +23,7 @@ function renderNotes(notes) {
   for (const note of sorted) {
     const li = document.createElement("li");
     const screenshotHtml = note.screenshot
-      ? `<img src="${note.screenshot}" style="max-width:100%;border-radius:4px;margin-top:4px;" />`
+      ? `<img src="${note.screenshot}" data-action="open-image" style="max-width:100%;border-radius:4px;margin-top:4px;cursor:pointer;" title="Click to view full size" />`
       : "";
     li.innerHTML = `
       <span class="badge ${note.category}">${note.category}</span>
@@ -55,6 +55,11 @@ async function loadNotes() {
 }
 
 noteListEl.addEventListener("click", async (e) => {
+  if (e.target.dataset.action === "open-image") {
+    chrome.tabs.create({ url: e.target.src });
+    return;
+  }
+
   const btn = e.target.closest("button");
   if (!btn) return;
   const id = btn.dataset.id;

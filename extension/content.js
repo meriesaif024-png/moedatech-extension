@@ -152,7 +152,7 @@
     `;
 
     const screenshotHtml = note.screenshot
-      ? `<img src="${note.screenshot}" style="max-width:100%;border-radius:4px;border:1px solid #eee;margin-bottom:6px;" />`
+      ? `<img src="${note.screenshot}" data-action="open-image" style="max-width:100%;border-radius:4px;border:1px solid #eee;margin-bottom:6px;cursor:pointer;" title="Click to view full size" />`
       : "";
     card.innerHTML = `
       <div style="font-weight:600;text-transform:capitalize;margin-bottom:4px;">${note.category}</div>
@@ -163,6 +163,11 @@
         <button data-action="delete" style="flex:1;">Delete</button>
       </div>
     `;
+
+    card.querySelector('[data-action="open-image"]')?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      chrome.runtime.sendMessage({ type: "SPF_OPEN_URL", url: note.screenshot });
+    });
 
     card.querySelector('[data-action="delete"]').addEventListener("click", (e) => {
       e.stopPropagation();

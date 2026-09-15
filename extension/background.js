@@ -52,6 +52,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((err) => sendResponse({ error: err.message }));
     return true;
   }
+
+  if (message.type === "SPF_OPEN_URL") {
+    chrome.tabs.create({ url: message.url });
+    return;
+  }
 });
 
 const MAX_SCREENSHOT_DIMENSION = 1400;

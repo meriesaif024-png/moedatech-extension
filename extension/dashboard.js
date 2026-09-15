@@ -42,7 +42,7 @@ function render(notes) {
       const div = document.createElement("div");
       div.className = "note";
       const screenshotHtml = note.screenshot
-        ? `<img src="${note.screenshot}" style="max-width:280px;border-radius:4px;display:block;margin-top:4px;" />`
+        ? `<img src="${note.screenshot}" data-action="open-image" style="max-width:280px;border-radius:4px;display:block;margin-top:4px;cursor:pointer;" title="Click to view full size" />`
         : "";
       div.innerHTML = `
         <span class="badge ${note.category}">${note.category}</span>
@@ -60,6 +60,11 @@ function render(notes) {
 }
 
 groupsEl.addEventListener("click", async (e) => {
+  if (e.target.dataset.action === "open-image") {
+    chrome.tabs.create({ url: e.target.src });
+    return;
+  }
+
   const btn = e.target.closest("button");
   if (!btn) return;
   const id = btn.dataset.id;
