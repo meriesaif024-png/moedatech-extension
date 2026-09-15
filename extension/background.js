@@ -55,6 +55,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "SPF_ASSIGN_NOTE") {
+    api(`/api/notes/${message.id}`, { method: "PATCH", body: JSON.stringify({ assignedTo: message.assignedTo }) })
+      .then((note) => sendResponse({ note }))
+      .catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
+
+  if (message.type === "SPF_GET_TEAM_MEMBERS") {
+    api("/api/team-members")
+      .then((members) => sendResponse({ members }))
+      .catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
+
+  if (message.type === "SPF_ADD_TEAM_MEMBER") {
+    api("/api/team-members", { method: "POST", body: JSON.stringify({ name: message.name }) })
+      .then((member) => sendResponse({ member }))
+      .catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
+
   if (message.type === "SPF_CAPTURE_ELEMENT") {
     const windowId = sender.tab?.windowId;
     captureElement(windowId, message.rect, message.dpr)

@@ -29,6 +29,7 @@ async function init() {
       tab_selectors TEXT,
       completed_by TEXT,
       completed_at TIMESTAMPTZ,
+      assigned_to TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
@@ -36,6 +37,15 @@ async function init() {
   await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS tab_selectors TEXT;`);
   await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS completed_by TEXT;`);
   await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;`);
+  await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS assigned_to TEXT;`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS team_members (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
 }
 
 const app = express();
@@ -62,12 +72,13 @@ app.get("/api/notes", async (req, res) => {
 });
 
 app.post("/api/notes", async (req, res) => {
-  const { url, pageTitle, selector, xPercent, yPercent, category, text, author, screenshot, tabSelectors } = req.body;
+  const { url, pageTitle, selector, xPercent, yPercent, category, text, author, screenshot, tabSelectors, assignedTo } =
+    req.body;
   if (!url) return res.status(400).json({ error: "url is required" });
 
   const result = await pool.query(
-    `INSERT INTO notes (url, page_title, selector, x_percent, y_percent, category, text, author, screenshot, tab_selectors)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+    `INSERT INTO notes (url, page_title, selector, x_percent, y_percent, category, text, author, screenshot, tab_selectors, assigned_to)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
     [
       url,
       pageTitle || null,
@@ -79,13 +90,24 @@ app.post("/api/notes", async (req, res) => {
       author || "Anonymous",
       screenshot || null,
       tabSelectors ? JSON.stringify(tabSelectors) : null,
+      assignedTo || null,
     ]
   );
   res.status(201).json(result.rows[0]);
 });
 
 app.patch("/api/notes/:id", async (req, res) => {
-  const { status, completedBy } = req.body;
+  const { status, completedBy, assignedTo } = req.body;
+
+  if (assignedTo !== undefined) {
+    const result = await pool.query("UPDATE notes SET assigned_to = $1 WHERE id = $2 RETURNING *", [
+      assignedTo || null,
+      req.params.id,
+    ]);
+    if (!result.rows[0]) return res.status(404).json({ error: "not found" });
+    return res.json(result.rows[0]);
+  }
+
   if (!["open", "done"].includes(status)) return res.status(400).json({ error: "invalid status" });
 
   const result =
@@ -104,6 +126,27 @@ app.patch("/api/notes/:id", async (req, res) => {
 
 app.delete("/api/notes/:id", async (req, res) => {
   await pool.query("DELETE FROM notes WHERE id = $1", [req.params.id]);
+  res.status(204).end();
+});
+
+app.get("/api/team-members", async (req, res) => {
+  const result = await pool.query("SELECT * FROM team_members ORDER BY name");
+  res.json(result.rows);
+});
+
+app.post("/api/team-members", async (req, res) => {
+  const name = (req.body.name || "").trim();
+  if (!name) return res.status(400).json({ error: "name is required" });
+
+  const result = await pool.query(
+    "INSERT INTO team_members (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING *",
+    [name]
+  );
+  res.status(201).json(result.rows[0]);
+});
+
+app.delete("/api/team-members/:id", async (req, res) => {
+  await pool.query("DELETE FROM team_members WHERE id = $1", [req.params.id]);
   res.status(204).end();
 });
 
