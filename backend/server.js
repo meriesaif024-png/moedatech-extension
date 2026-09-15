@@ -27,11 +27,15 @@ async function init() {
       status TEXT NOT NULL DEFAULT 'open',
       screenshot TEXT,
       tab_selectors TEXT,
+      completed_by TEXT,
+      completed_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
   await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS screenshot TEXT;`);
   await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS tab_selectors TEXT;`);
+  await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS completed_by TEXT;`);
+  await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;`);
 }
 
 const app = express();
@@ -81,10 +85,19 @@ app.post("/api/notes", async (req, res) => {
 });
 
 app.patch("/api/notes/:id", async (req, res) => {
-  const { status } = req.body;
+  const { status, completedBy } = req.body;
   if (!["open", "done"].includes(status)) return res.status(400).json({ error: "invalid status" });
 
-  const result = await pool.query("UPDATE notes SET status = $1 WHERE id = $2 RETURNING *", [status, req.params.id]);
+  const result =
+    status === "done"
+      ? await pool.query(
+          "UPDATE notes SET status = $1, completed_by = $2, completed_at = now() WHERE id = $3 RETURNING *",
+          [status, completedBy || "Anonymous", req.params.id]
+        )
+      : await pool.query(
+          "UPDATE notes SET status = $1, completed_by = NULL, completed_at = NULL WHERE id = $2 RETURNING *",
+          [status, req.params.id]
+        );
   if (!result.rows[0]) return res.status(404).json({ error: "not found" });
   res.json(result.rows[0]);
 });

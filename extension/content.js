@@ -67,6 +67,17 @@
     });
   }
 
+  async function getCompleterName() {
+    const { spfCompleterName } = await new Promise((resolve) =>
+      chrome.storage.local.get(["spfCompleterName"], resolve)
+    );
+    const name = window.prompt("Your name (so the team knows who resolved this):", spfCompleterName || "");
+    if (name === null) return null;
+    const trimmed = name.trim() || "Anonymous";
+    chrome.storage.local.set({ spfCompleterName: trimmed });
+    return trimmed;
+  }
+
   function fetchNotes() {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({ type: "SPF_GET_NOTES", url: location.href }, (response) => {
@@ -166,12 +177,18 @@
     const screenshotHtml = note.screenshot
       ? `<img src="${note.screenshot}" data-action="open-image" style="max-width:100%;border-radius:4px;border:1px solid #eee;margin-bottom:6px;cursor:pointer;" title="Click to view full size" />`
       : "";
+    const completedHtml =
+      note.status === "done"
+        ? `<div style="color:#188038;font-size:11px;margin-bottom:8px;">&#10003; Completed by ${escapeHtml(note.completed_by || "Anonymous")} &middot; ${new Date(note.completed_at).toLocaleString()}</div>`
+        : "";
     card.innerHTML = `
       <div style="font-weight:600;text-transform:capitalize;margin-bottom:4px;">${note.category}</div>
       ${screenshotHtml}
       <div style="margin-bottom:6px;white-space:pre-wrap;">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</div>
       <div style="color:#666;font-size:11px;margin-bottom:8px;">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</div>
+      ${completedHtml}
       <div style="display:flex;gap:6px;">
+        <button data-action="toggle" style="flex:1;">${note.status === "done" ? "Reopen" : "Mark complete"}</button>
         <button data-action="delete" style="flex:1;">Delete</button>
       </div>
     `;
@@ -179,6 +196,28 @@
     card.querySelector('[data-action="open-image"]')?.addEventListener("click", (e) => {
       e.stopPropagation();
       openLightbox(note.screenshot);
+    });
+
+    card.querySelector('[data-action="toggle"]').addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (note.status === "done") {
+        chrome.runtime.sendMessage({ type: "SPF_UPDATE_STATUS", id: note.id, status: "open" }, async () => {
+          card.remove();
+          openPopover = null;
+          renderMarkers(await fetchNotes());
+        });
+        return;
+      }
+      const completedBy = await getCompleterName();
+      if (completedBy === null) return;
+      chrome.runtime.sendMessage(
+        { type: "SPF_UPDATE_STATUS", id: note.id, status: "done", completedBy },
+        async () => {
+          card.remove();
+          openPopover = null;
+          renderMarkers(await fetchNotes());
+        }
+      );
     });
 
     card.querySelector('[data-action="delete"]').addEventListener("click", (e) => {

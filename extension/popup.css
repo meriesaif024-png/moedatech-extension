@@ -85,6 +85,10 @@ h1 {
   margin-top: 2px;
 }
 
+#noteList li.done {
+  opacity: 0.6;
+}
+
 .noteActions {
   margin-top: 6px;
   display: flex;

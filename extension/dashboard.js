@@ -40,16 +40,22 @@ function render(notes) {
 
     for (const note of notes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))) {
       const div = document.createElement("div");
-      div.className = "note";
+      div.className = "note" + (note.status === "done" ? " done" : "");
       const screenshotHtml = note.screenshot
         ? `<img src="${note.screenshot}" data-action="open-image" style="max-width:280px;border-radius:4px;display:block;margin-top:4px;cursor:pointer;" title="Click to view full size" />`
         : "";
+      const completedHtml =
+        note.status === "done"
+          ? `<span class="noteMeta">&#10003; Completed by ${escapeHtml(note.completed_by || "Anonymous")} &middot; ${new Date(note.completed_at).toLocaleString()}</span>`
+          : "";
       div.innerHTML = `
         <span class="badge ${note.category}">${note.category}</span>
         <span class="noteMeta">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</span>
         <span class="noteText">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</span>
         ${screenshotHtml}
+        ${completedHtml}
         <div class="noteActions">
+          <button data-action="toggle" data-id="${note.id}" data-status="${note.status}">${note.status === "done" ? "Reopen" : "Mark complete"}</button>
           <button data-action="delete" data-id="${note.id}">Delete</button>
         </div>
       `;
@@ -68,6 +74,16 @@ function openLightbox(src) {
   document.body.appendChild(overlay);
 }
 
+async function markComplete(id) {
+  const { spfCompleterName } = await chrome.storage.local.get(["spfCompleterName"]);
+  const name = window.prompt("Your name (so the team knows who resolved this):", spfCompleterName || "");
+  if (name === null) return false;
+  const trimmed = name.trim() || "Anonymous";
+  await chrome.storage.local.set({ spfCompleterName: trimmed });
+  await sendMessage({ type: "SPF_UPDATE_STATUS", id, status: "done", completedBy: trimmed });
+  return true;
+}
+
 groupsEl.addEventListener("click", async (e) => {
   if (e.target.dataset.action === "open-image") {
     openLightbox(e.target.src);
@@ -77,6 +93,15 @@ groupsEl.addEventListener("click", async (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
   const id = btn.dataset.id;
+
+  if (btn.dataset.action === "toggle") {
+    if (btn.dataset.status === "done") {
+      await sendMessage({ type: "SPF_UPDATE_STATUS", id, status: "open" });
+      load();
+    } else {
+      if (await markComplete(id)) load();
+    }
+  }
 
   if (btn.dataset.action === "delete") {
     await sendMessage({ type: "SPF_DELETE_NOTE", id });
