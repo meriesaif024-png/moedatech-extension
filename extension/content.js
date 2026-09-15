@@ -84,9 +84,9 @@
   function openLightbox(src) {
     const overlay = document.createElement("div");
     overlay.style.cssText =
-      "position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2147483647;display:flex;align-items:center;justify-content:center;cursor:zoom-out;";
-    overlay.innerHTML = `<img src="${src}" style="max-width:92vw;max-height:92vh;border-radius:4px;box-shadow:0 8px 32px rgba(0,0,0,0.5);" />`;
-    overlay.addEventListener("click", (e) => {
+      "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;pointer-events:none;";
+    overlay.innerHTML = `<img src="${src}" style="max-width:92vw;max-height:92vh;border-radius:4px;box-shadow:0 8px 32px rgba(0,0,0,0.5);cursor:zoom-out;pointer-events:auto;" />`;
+    overlay.querySelector("img").addEventListener("click", (e) => {
       e.stopPropagation();
       overlay.remove();
     });
