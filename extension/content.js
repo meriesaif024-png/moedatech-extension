@@ -10,8 +10,6 @@
   let annotating = false;
   let hoverBox = null;
   let shadowRoot = null;
-  let markersRoot = null;
-  let currentNotes = [];
 
   // The host page's own CSS (direction, fonts, button/textarea resets, z-index
   // stacking) can otherwise bleed into anything we inject. A shadow root with
@@ -67,25 +65,6 @@
     });
   }
 
-  async function getCompleterName() {
-    const { spfCompleterName } = await new Promise((resolve) =>
-      chrome.storage.local.get(["spfCompleterName"], resolve)
-    );
-    const name = window.prompt("Your name (so the team knows who resolved this):", spfCompleterName || "");
-    if (name === null) return null;
-    const trimmed = name.trim() || "Anonymous";
-    chrome.storage.local.set({ spfCompleterName: trimmed });
-    return trimmed;
-  }
-
-  function fetchNotes() {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type: "SPF_GET_NOTES", url: location.href }, (response) => {
-        resolve(response?.notes || []);
-      });
-    });
-  }
-
   function fetchTeamMembers() {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({ type: "SPF_GET_TEAM_MEMBERS" }, (response) => {
@@ -136,168 +115,6 @@
     const div = document.createElement("div");
     div.textContent = str || "";
     return div.innerHTML;
-  }
-
-  function openLightbox(src) {
-    const overlay = document.createElement("div");
-    overlay.style.cssText =
-      "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;pointer-events:none;";
-    overlay.innerHTML = `<img src="${src}" style="max-width:92vw;max-height:92vh;border-radius:4px;box-shadow:0 8px 32px rgba(0,0,0,0.5);cursor:zoom-out;pointer-events:auto;" />`;
-    overlay.querySelector("img").addEventListener("click", (e) => {
-      e.stopPropagation();
-      overlay.remove();
-    });
-    getRoot().appendChild(overlay);
-  }
-
-  function ensureMarkersRoot() {
-    if (markersRoot) return markersRoot;
-    markersRoot = document.createElement("div");
-    markersRoot.style.cssText = "position:absolute;top:0;left:0;width:0;height:0;z-index:2147483000;";
-    getRoot().appendChild(markersRoot);
-    return markersRoot;
-  }
-
-  function positionForNote(note) {
-    if (note.selector) {
-      const el = document.querySelector(note.selector);
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        return { x: rect.left + window.scrollX, y: rect.top + window.scrollY };
-      }
-    }
-    const docEl = document.documentElement;
-    return {
-      x: ((note.x_percent || 0) / 100) * docEl.scrollWidth,
-      y: ((note.y_percent || 0) / 100) * docEl.scrollHeight,
-    };
-  }
-
-  function renderMarkers(notes) {
-    currentNotes = notes;
-    const root = ensureMarkersRoot();
-    root.innerHTML = "";
-
-    notes.forEach((note) => {
-      const pos = positionForNote(note);
-      const color = CATEGORY_COLORS[note.category] || CATEGORY_COLORS.other;
-      const marker = document.createElement("div");
-
-      marker.style.cssText = `
-        position:absolute;left:${pos.x}px;top:${pos.y}px;
-        width:22px;height:22px;border-radius:50% 50% 50% 0;
-        transform:translate(-50%,-100%) rotate(45deg);
-        background:${color};border:2px solid white;
-        box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:pointer;
-        pointer-events:auto;
-      `;
-      marker.title = note.text || note.category;
-
-      marker.addEventListener("click", (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        toggleNotePopover(marker, note);
-      });
-
-      root.appendChild(marker);
-    });
-  }
-
-  let openPopover = null;
-
-  function toggleNotePopover(marker, note) {
-    if (openPopover) {
-      openPopover.remove();
-      openPopover = null;
-    }
-
-    const rect = marker.getBoundingClientRect();
-    const card = document.createElement("div");
-    card.style.cssText = `
-      position:fixed;left:${Math.min(rect.left, window.innerWidth - 260)}px;top:${rect.bottom + 6}px;
-      width:240px;background:white;color:#1f1f1f;border-radius:8px;
-      box-shadow:0 4px 16px rgba(0,0,0,0.25);padding:10px;
-      font-size:12px;z-index:2147483647;
-    `;
-
-    const screenshotHtml = note.screenshot
-      ? `<img src="${note.screenshot}" data-action="open-image" style="max-width:100%;border-radius:4px;border:1px solid #eee;margin-bottom:6px;cursor:pointer;" title="Click to view full size" />`
-      : "";
-    const completedHtml =
-      note.status === "done"
-        ? `<div style="color:#666;font-size:11px;margin-bottom:8px;">&#10003; Completed by <span style="color:#188038;font-size:15px;font-weight:700;">${escapeHtml(note.completed_by || "Anonymous")}</span> &middot; ${new Date(note.completed_at).toLocaleString()}</div>`
-        : "";
-    card.innerHTML = `
-      <div style="font-weight:600;text-transform:capitalize;margin-bottom:4px;">${note.category}</div>
-      ${screenshotHtml}
-      <div style="margin-bottom:6px;white-space:pre-wrap;">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</div>
-      <div style="color:#666;font-size:11px;margin-bottom:8px;">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</div>
-      ${completedHtml}
-      <label style="display:block;font-size:11px;color:#666;margin-bottom:2px;">Assigned to:</label>
-      <select data-role="assignee" style="width:100%;margin-bottom:8px;padding:4px;font-size:12px;">
-        <option>Loading&hellip;</option>
-      </select>
-      <div style="display:flex;gap:6px;">
-        <button data-action="toggle" style="flex:1;">${note.status === "done" ? "Reopen" : "Mark complete"}</button>
-        <button data-action="delete" style="flex:1;">Delete</button>
-      </div>
-    `;
-
-    wireAssigneeSelect(card.querySelector('[data-role="assignee"]'), note.assigned_to, (assignedTo) => {
-      chrome.runtime.sendMessage({ type: "SPF_ASSIGN_NOTE", id: note.id, assignedTo });
-      note.assigned_to = assignedTo;
-    });
-
-    card.querySelector('[data-action="open-image"]')?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      openLightbox(note.screenshot);
-    });
-
-    card.querySelector('[data-action="toggle"]').addEventListener("click", async (e) => {
-      e.stopPropagation();
-      if (note.status === "done") {
-        chrome.runtime.sendMessage({ type: "SPF_UPDATE_STATUS", id: note.id, status: "open" }, async () => {
-          card.remove();
-          openPopover = null;
-          renderMarkers(await fetchNotes());
-        });
-        return;
-      }
-      const completedBy = await getCompleterName();
-      if (completedBy === null) return;
-      chrome.runtime.sendMessage(
-        { type: "SPF_UPDATE_STATUS", id: note.id, status: "done", completedBy },
-        async () => {
-          card.remove();
-          openPopover = null;
-          renderMarkers(await fetchNotes());
-        }
-      );
-    });
-
-    card.querySelector('[data-action="delete"]').addEventListener("click", (e) => {
-      e.stopPropagation();
-      chrome.runtime.sendMessage({ type: "SPF_DELETE_NOTE", id: note.id }, async () => {
-        card.remove();
-        openPopover = null;
-        renderMarkers(await fetchNotes());
-      });
-    });
-
-    getRoot().appendChild(card);
-    openPopover = card;
-
-    setTimeout(() => {
-      document.addEventListener(
-        "click",
-        function closeOnce() {
-          card.remove();
-          if (openPopover === card) openPopover = null;
-          document.removeEventListener("click", closeOnce);
-        },
-        { once: true }
-      );
-    }, 0);
   }
 
   let dragStart = null;
@@ -515,9 +332,8 @@
             assignedTo: selectedAssignee,
           },
         },
-        async () => {
+        () => {
           form.remove();
-          renderMarkers(await fetchNotes());
         }
       );
     });
@@ -528,8 +344,4 @@
       startAnnotate();
     }
   });
-
-  window.addEventListener("resize", () => renderMarkers(currentNotes));
-
-  fetchNotes().then(renderMarkers);
 })();
