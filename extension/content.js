@@ -81,6 +81,18 @@
     return div.innerHTML;
   }
 
+  function openLightbox(src) {
+    const overlay = document.createElement("div");
+    overlay.style.cssText =
+      "position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2147483647;display:flex;align-items:center;justify-content:center;cursor:zoom-out;";
+    overlay.innerHTML = `<img src="${src}" style="max-width:92vw;max-height:92vh;border-radius:4px;box-shadow:0 8px 32px rgba(0,0,0,0.5);" />`;
+    overlay.addEventListener("click", (e) => {
+      e.stopPropagation();
+      overlay.remove();
+    });
+    getRoot().appendChild(overlay);
+  }
+
   function ensureMarkersRoot() {
     if (markersRoot) return markersRoot;
     markersRoot = document.createElement("div");
@@ -166,7 +178,7 @@
 
     card.querySelector('[data-action="open-image"]')?.addEventListener("click", (e) => {
       e.stopPropagation();
-      chrome.runtime.sendMessage({ type: "SPF_OPEN_URL", url: note.screenshot });
+      openLightbox(note.screenshot);
     });
 
     card.querySelector('[data-action="delete"]').addEventListener("click", (e) => {

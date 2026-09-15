@@ -59,9 +59,18 @@ function render(notes) {
   }
 }
 
+function openLightbox(src) {
+  const overlay = document.createElement("div");
+  overlay.style.cssText =
+    "position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;";
+  overlay.innerHTML = `<img src="${src}" style="max-width:92vw;max-height:92vh;border-radius:4px;box-shadow:0 8px 32px rgba(0,0,0,0.5);" />`;
+  overlay.addEventListener("click", () => overlay.remove());
+  document.body.appendChild(overlay);
+}
+
 groupsEl.addEventListener("click", async (e) => {
   if (e.target.dataset.action === "open-image") {
-    chrome.tabs.create({ url: e.target.src });
+    openLightbox(e.target.src);
     return;
   }
 

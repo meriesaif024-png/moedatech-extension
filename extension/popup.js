@@ -54,9 +54,18 @@ async function loadNotes() {
   renderNotes(response?.notes || []);
 }
 
+function openLightbox(src) {
+  const overlay = document.createElement("div");
+  overlay.style.cssText =
+    "position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;";
+  overlay.innerHTML = `<img src="${src}" style="max-width:94%;max-height:94%;border-radius:4px;" />`;
+  overlay.addEventListener("click", () => overlay.remove());
+  document.body.appendChild(overlay);
+}
+
 noteListEl.addEventListener("click", async (e) => {
   if (e.target.dataset.action === "open-image") {
-    chrome.tabs.create({ url: e.target.src });
+    openLightbox(e.target.src);
     return;
   }
 
