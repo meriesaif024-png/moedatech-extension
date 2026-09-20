@@ -19,9 +19,64 @@ h1 {
   margin: 0;
 }
 
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
 .actions button {
+  font-size: 11px;
+  padding: 4px 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#quickNoteForm {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fafafa;
+}
+
+#quickNoteForm .catRow {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+#quickNoteForm .catRow button {
+  flex: 1;
+  padding: 5px 0;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  background: white;
+}
+
+#quickNoteForm textarea {
+  width: 100%;
+  height: 50px;
+  margin-bottom: 6px;
+  padding: 4px;
   font-size: 12px;
-  padding: 4px 8px;
+  box-sizing: border-box;
+}
+
+#quickNoteForm select {
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 4px;
+  font-size: 12px;
+}
+
+#quickNoteForm .formActions {
+  display: flex;
+  gap: 6px;
+}
+
+#quickNoteForm .formActions button {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 12px;
   cursor: pointer;
 }
 

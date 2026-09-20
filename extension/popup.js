@@ -5,6 +5,15 @@ const meSavedEl = document.getElementById("meSaved");
 
 let activeTabId = null;
 let activeTabUrl = null;
+let activeTabTitle = null;
+
+const CATEGORY_COLORS = {
+  bug: "#d93025",
+  remove: "#e37400",
+  add: "#188038",
+  change: "#1a73e8",
+  other: "#5f6368",
+};
 
 async function getActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -151,6 +160,83 @@ noteListEl.addEventListener("click", async (e) => {
   }
 });
 
+const quickNoteFormEl = document.getElementById("quickNoteForm");
+const CATEGORIES = [
+  { key: "bug", label: "Bug" },
+  { key: "remove", label: "Remove" },
+  { key: "add", label: "Add" },
+  { key: "change", label: "Change" },
+];
+
+function renderQuickNoteForm() {
+  let selectedCategory = "bug";
+
+  const categoryButtonsHtml = CATEGORIES.map(
+    (c) =>
+      `<button type="button" data-category="${c.key}" class="qn-cat-btn" style="border:1px solid ${CATEGORY_COLORS[c.key]};background:${c.key === selectedCategory ? CATEGORY_COLORS[c.key] : "white"};color:${c.key === selectedCategory ? "white" : CATEGORY_COLORS[c.key]};">${c.label}</button>`
+  ).join("");
+
+  quickNoteFormEl.innerHTML = `
+    <div class="catRow">${categoryButtonsHtml}</div>
+    <textarea id="qn-text" placeholder="What's the note? (no page selection needed)"></textarea>
+    <select id="qn-assignee"><option>Loading&hellip;</option></select>
+    <div class="formActions">
+      <button id="qn-save">Save</button>
+      <button id="qn-cancel">Cancel</button>
+    </div>
+  `;
+
+  quickNoteFormEl.querySelectorAll(".qn-cat-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      selectedCategory = btn.dataset.category;
+      quickNoteFormEl.querySelectorAll(".qn-cat-btn").forEach((b) => {
+        const color = CATEGORY_COLORS[b.dataset.category];
+        const active = b.dataset.category === selectedCategory;
+        b.style.background = active ? color : "white";
+        b.style.color = active ? "white" : color;
+      });
+    });
+  });
+
+  let selectedAssignee = null;
+  wireAssigneeSelect(quickNoteFormEl.querySelector("#qn-assignee"), null, (assignedTo) => {
+    selectedAssignee = assignedTo;
+  });
+
+  quickNoteFormEl.querySelector("#qn-cancel").addEventListener("click", () => {
+    quickNoteFormEl.hidden = true;
+  });
+
+  quickNoteFormEl.querySelector("#qn-save").addEventListener("click", async () => {
+    const text = quickNoteFormEl.querySelector("#qn-text").value.trim();
+    const { spfMyName } = await chrome.storage.local.get(["spfMyName"]);
+
+    await sendMessage({
+      type: "SPF_ADD_NOTE",
+      note: {
+        url: activeTabUrl,
+        pageTitle: activeTabTitle,
+        category: selectedCategory,
+        text,
+        author: spfMyName || "Anonymous",
+        assignedTo: selectedAssignee,
+      },
+    });
+
+    quickNoteFormEl.hidden = true;
+    loadNotes();
+  });
+}
+
+document.getElementById("quickNote").addEventListener("click", () => {
+  if (quickNoteFormEl.hidden) {
+    renderQuickNoteForm();
+    quickNoteFormEl.hidden = false;
+  } else {
+    quickNoteFormEl.hidden = true;
+  }
+});
+
 document.getElementById("addNote").addEventListener("click", async () => {
   if (activeTabId == null) return;
   try {
@@ -181,5 +267,6 @@ myNameInput.addEventListener("change", async () => {
   const tab = await getActiveTab();
   activeTabId = tab?.id ?? null;
   activeTabUrl = tab?.url ?? null;
+  activeTabTitle = tab?.title ?? null;
   await loadNotes();
 })();
