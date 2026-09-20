@@ -99,10 +99,10 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === COMPLETION_CHECK_ALARM) checkForCompletions();
+  if (alarm.name === COMPLETION_CHECK_ALARM) checkForUpdates();
 });
 
-async function checkForCompletions() {
+async function checkForUpdates() {
   const { spfLastCheckedAt } = await chrome.storage.local.get(["spfLastCheckedAt"]);
   const since = spfLastCheckedAt ? new Date(spfLastCheckedAt) : new Date(0);
   const checkedAt = new Date().toISOString();
@@ -119,10 +119,24 @@ async function checkForCompletions() {
   );
 
   for (const note of newlyCompleted) {
-    chrome.notifications.create(`spf-note-${note.id}`, {
+    chrome.notifications.create(`spf-complete-${note.id}`, {
       type: "basic",
       iconUrl: "icon128.png",
       title: `${note.completed_by || "Someone"} completed a "${note.category}" note`,
+      message: note.text || "(no note)",
+      contextMessage: note.page_title || note.url,
+    });
+  }
+
+  const newlyAssigned = notes.filter(
+    (n) => n.assigned_to && n.assigned_at && new Date(n.assigned_at) > since
+  );
+
+  for (const note of newlyAssigned) {
+    chrome.notifications.create(`spf-assign-${note.id}`, {
+      type: "basic",
+      iconUrl: "icon128.png",
+      title: `${note.category} note assigned to ${note.assigned_to}`,
       message: note.text || "(no note)",
       contextMessage: note.page_title || note.url,
     });
