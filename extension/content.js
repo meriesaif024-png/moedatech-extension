@@ -279,9 +279,16 @@
       ? `<img src="${screenshotDataUrl}" style="max-width:100%;border-radius:4px;border:1px solid #eee;" />`
       : `<div style="font-size:11px;color:#888;">Screenshot unavailable${captureResponse?.error ? ": " + captureResponse.error : ""}</div>`;
 
+    const includeToggleHtml = screenshotDataUrl
+      ? `<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555;margin-bottom:6px;cursor:pointer;">
+           <input type="checkbox" id="spf-include-shot" checked /> Include screenshot
+         </label>`
+      : "";
+
     form.innerHTML = `
       <div style="display:flex;gap:4px;margin-bottom:6px;">${categoryButtonsHtml}</div>
       <div id="spf-shot-preview" style="margin-bottom:6px;">${previewHtml}</div>
+      ${includeToggleHtml}
       <textarea id="spf-text" placeholder="What's the note?" style="width:100%;height:60px;margin-bottom:6px;padding:4px;font-size:12px;"></textarea>
       <select id="spf-assignee" style="width:100%;margin-bottom:6px;padding:4px;font-size:12px;">
         <option>Loading&hellip;</option>
@@ -311,6 +318,12 @@
       selectedAssignee = assignedTo;
     });
 
+    const includeShotCheckbox = form.querySelector("#spf-include-shot");
+    const shotPreview = form.querySelector("#spf-shot-preview");
+    includeShotCheckbox?.addEventListener("change", () => {
+      shotPreview.style.display = includeShotCheckbox.checked ? "" : "none";
+    });
+
     const saveBtn = form.querySelector("#spf-save");
 
     form.querySelector("#spf-cancel").addEventListener("click", () => form.remove());
@@ -318,6 +331,7 @@
     saveBtn.addEventListener("click", async () => {
       const text = form.querySelector("#spf-text").value.trim();
       const author = await getAuthor();
+      const includeShot = includeShotCheckbox ? includeShotCheckbox.checked : false;
 
       chrome.runtime.sendMessage(
         {
@@ -331,7 +345,7 @@
             category: selectedCategory,
             text,
             author,
-            screenshot: screenshotDataUrl,
+            screenshot: includeShot ? screenshotDataUrl : null,
             assignedTo: selectedAssignee,
           },
         },
