@@ -163,7 +163,8 @@ document.getElementById("addNote").addEventListener("click", async () => {
 
 document.getElementById("viewAll").addEventListener("click", (e) => {
   e.preventDefault();
-  chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
+  sendMessage({ type: "SPF_OPEN_DASHBOARD" });
+  window.close();
 });
 
 myNameInput.addEventListener("change", async () => {

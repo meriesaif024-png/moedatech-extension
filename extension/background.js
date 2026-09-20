@@ -83,6 +83,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((err) => sendResponse({ error: err.message }));
     return true;
   }
+
+  if (message.type === "SPF_OPEN_DASHBOARD") {
+    openOrFocusDashboard();
+    return;
+  }
 });
 
 const COMPLETION_CHECK_ALARM = "spfCheckCompletions";
@@ -154,8 +159,21 @@ async function checkForUpdates() {
   await chrome.storage.local.set({ spfLastCheckedAt: checkedAt });
 }
 
-chrome.notifications.onClicked.addListener(() => {
-  chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
+async function openOrFocusDashboard() {
+  const dashboardUrl = chrome.runtime.getURL("dashboard.html");
+  const [existing] = await chrome.tabs.query({ url: dashboardUrl });
+  if (existing) {
+    chrome.tabs.update(existing.id, { active: true });
+    chrome.windows.update(existing.windowId, { focused: true });
+  } else {
+    chrome.tabs.create({ url: dashboardUrl });
+  }
+}
+
+chrome.notifications.onClicked.addListener(openOrFocusDashboard);
+
+chrome.commands.onCommand.addListener((command) => {
+  if (command === "open_dashboard") openOrFocusDashboard();
 });
 
 const MAX_SCREENSHOT_DIMENSION = 1000;

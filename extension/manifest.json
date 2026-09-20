@@ -33,5 +33,11 @@
       "48": "icon48.png",
       "128": "icon128.png"
     }
+  },
+  "commands": {
+    "open_dashboard": {
+      "suggested_key": { "default": "Alt+Shift+M" },
+      "description": "Open the notes dashboard"
+    }
   }
 }
