@@ -239,11 +239,23 @@ document.getElementById("quickNote").addEventListener("click", () => {
 
 document.getElementById("addNote").addEventListener("click", async () => {
   if (activeTabId == null) return;
+
   try {
     await chrome.tabs.sendMessage(activeTabId, { type: "SPF_START_ANNOTATE" });
     window.close();
+    return;
   } catch (err) {
-    statusEl.textContent = "Can't annotate this page - reload the page (F5) and try again.";
+    // The content script probably isn't injected yet - e.g. the page was
+    // open before the extension was installed/reloaded. Inject it now and
+    // retry once instead of making the user manually refresh the page.
+  }
+
+  try {
+    await chrome.scripting.executeScript({ target: { tabId: activeTabId }, files: ["content.js"] });
+    await chrome.tabs.sendMessage(activeTabId, { type: "SPF_START_ANNOTATE" });
+    window.close();
+  } catch (err) {
+    statusEl.textContent = "Can't annotate this page - it may not be a supported site.";
   }
 });
 
