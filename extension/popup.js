@@ -1,5 +1,7 @@
 const noteListEl = document.getElementById("noteList");
 const statusEl = document.getElementById("status");
+const myNameInput = document.getElementById("myName");
+const meSavedEl = document.getElementById("meSaved");
 
 let activeTabId = null;
 let activeTabUrl = null;
@@ -87,8 +89,11 @@ function renderNotes(notes) {
 }
 
 async function markComplete(id) {
-  const { spfCompleterName } = await chrome.storage.local.get(["spfCompleterName"]);
-  const name = window.prompt("Your name (so the team knows who resolved this):", spfCompleterName || "");
+  const { spfMyName, spfCompleterName } = await chrome.storage.local.get(["spfMyName", "spfCompleterName"]);
+  const name = window.prompt(
+    "Your name (so the team knows who resolved this):",
+    spfMyName || spfCompleterName || ""
+  );
   if (name === null) return false;
   const trimmed = name.trim() || "Anonymous";
   await chrome.storage.local.set({ spfCompleterName: trimmed });
@@ -161,7 +166,17 @@ document.getElementById("viewAll").addEventListener("click", (e) => {
   chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
 });
 
+myNameInput.addEventListener("change", async () => {
+  const trimmed = myNameInput.value.trim();
+  await chrome.storage.local.set({ spfMyName: trimmed });
+  meSavedEl.textContent = trimmed ? "Saved" : "";
+  setTimeout(() => (meSavedEl.textContent = ""), 2000);
+});
+
 (async function init() {
+  const { spfMyName } = await chrome.storage.local.get(["spfMyName"]);
+  myNameInput.value = spfMyName || "";
+
   const tab = await getActiveTab();
   activeTabId = tab?.id ?? null;
   activeTabUrl = tab?.url ?? null;

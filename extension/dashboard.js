@@ -149,8 +149,11 @@ function openLightbox(src) {
 }
 
 async function markComplete(id) {
-  const { spfCompleterName } = await chrome.storage.local.get(["spfCompleterName"]);
-  const name = window.prompt("Your name (so the team knows who resolved this):", spfCompleterName || "");
+  const { spfMyName, spfCompleterName } = await chrome.storage.local.get(["spfMyName", "spfCompleterName"]);
+  const name = window.prompt(
+    "Your name (so the team knows who resolved this):",
+    spfMyName || spfCompleterName || ""
+  );
   if (name === null) return false;
   const trimmed = name.trim() || "Anonymous";
   await chrome.storage.local.set({ spfCompleterName: trimmed });

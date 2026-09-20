@@ -128,15 +128,24 @@ async function checkForUpdates() {
     });
   }
 
-  const newlyAssigned = notes.filter(
-    (n) => n.assigned_to && n.assigned_at && new Date(n.assigned_at) > since
-  );
+  const { spfMyName } = await chrome.storage.local.get(["spfMyName"]);
+  const myName = (spfMyName || "").trim().toLowerCase();
+
+  const newlyAssigned = myName
+    ? notes.filter(
+        (n) =>
+          n.assigned_to &&
+          n.assigned_at &&
+          new Date(n.assigned_at) > since &&
+          n.assigned_to.trim().toLowerCase() === myName
+      )
+    : [];
 
   for (const note of newlyAssigned) {
     chrome.notifications.create(`spf-assign-${note.id}`, {
       type: "basic",
       iconUrl: "icon128.png",
-      title: `${note.category} note assigned to ${note.assigned_to}`,
+      title: `You were assigned a "${note.category}" note`,
       message: note.text || "(no note)",
       contextMessage: note.page_title || note.url,
     });
