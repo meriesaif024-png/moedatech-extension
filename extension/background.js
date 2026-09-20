@@ -107,6 +107,29 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === COMPLETION_CHECK_ALARM) checkForUpdates();
 });
 
+async function ensureOffscreenDocument() {
+  const has = await chrome.offscreen.hasDocument?.();
+  if (has) return;
+  await chrome.offscreen.createDocument({
+    url: "offscreen.html",
+    reasons: ["AUDIO_PLAYBACK"],
+    justification: "Play a sound when a note notification arrives",
+  });
+}
+
+async function playNotificationSound() {
+  try {
+    await ensureOffscreenDocument();
+    chrome.runtime.sendMessage({ type: "SPF_PLAY_SOUND" });
+  } catch {
+    // Offscreen audio is best-effort - the visual notification still shows either way.
+  }
+}
+
+function notify(id, options) {
+  chrome.notifications.create(id, { type: "basic", iconUrl: "icon128.png", ...options });
+}
+
 async function checkForUpdates() {
   const { spfLastCheckedAt } = await chrome.storage.local.get(["spfLastCheckedAt"]);
   const since = spfLastCheckedAt ? new Date(spfLastCheckedAt) : new Date(0);
@@ -119,22 +142,32 @@ async function checkForUpdates() {
     return;
   }
 
+  const { spfMyName } = await chrome.storage.local.get(["spfMyName"]);
+  const myName = (spfMyName || "").trim().toLowerCase();
+
   const newlyCompleted = notes.filter(
     (n) => n.status === "done" && n.completed_at && new Date(n.completed_at) > since
   );
 
-  for (const note of newlyCompleted) {
-    chrome.notifications.create(`spf-complete-${note.id}`, {
-      type: "basic",
-      iconUrl: "icon128.png",
-      title: `${note.completed_by || "Someone"} completed a "${note.category}" note`,
-      message: note.text || "(no note)",
-      contextMessage: note.page_title || note.url,
-    });
-  }
+  let firedAny = false;
 
-  const { spfMyName } = await chrome.storage.local.get(["spfMyName"]);
-  const myName = (spfMyName || "").trim().toLowerCase();
+  for (const note of newlyCompleted) {
+    const iAmAuthor = myName && (note.author || "").trim().toLowerCase() === myName;
+    if (iAmAuthor) {
+      notify(`spf-complete-${note.id}`, {
+        title: `Your "${note.category}" note was completed`,
+        message: `${note.completed_by || "Someone"} resolved it: ${note.text || "(no note)"}`,
+        contextMessage: note.page_title || note.url,
+      });
+    } else {
+      notify(`spf-complete-${note.id}`, {
+        title: `${note.completed_by || "Someone"} completed a "${note.category}" note`,
+        message: note.text || "(no note)",
+        contextMessage: note.page_title || note.url,
+      });
+    }
+    firedAny = true;
+  }
 
   const newlyAssigned = myName
     ? notes.filter(
@@ -147,14 +180,15 @@ async function checkForUpdates() {
     : [];
 
   for (const note of newlyAssigned) {
-    chrome.notifications.create(`spf-assign-${note.id}`, {
-      type: "basic",
-      iconUrl: "icon128.png",
+    notify(`spf-assign-${note.id}`, {
       title: `You were assigned a "${note.category}" note`,
       message: note.text || "(no note)",
       contextMessage: note.page_title || note.url,
     });
+    firedAny = true;
   }
+
+  if (firedAny) playNotificationSound();
 
   await chrome.storage.local.set({ spfLastCheckedAt: checkedAt });
 }
