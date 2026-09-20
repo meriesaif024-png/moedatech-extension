@@ -158,7 +158,7 @@ chrome.notifications.onClicked.addListener(() => {
   chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
 });
 
-const MAX_SCREENSHOT_DIMENSION = 1400;
+const MAX_SCREENSHOT_DIMENSION = 1000;
 
 // Captures the whole visible page (not just the clicked element) and marks
 // the chosen spot with a shaded overlay + border, so whoever picks up the
@@ -189,7 +189,7 @@ async function captureElement(windowId, rect, dpr) {
   ctx.lineWidth = 3;
   ctx.strokeRect(markX, markY, markW, markH);
 
-  const outputBlob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.85 });
+  const outputBlob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.78 });
   return await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);

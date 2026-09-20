@@ -230,8 +230,12 @@
 
     stopAnnotate();
 
-    // Capture the screenshot with none of our own UI on screen yet, so the
-    // note-creation form itself never ends up in the shot.
+    // The cursor never shows up in a captureVisibleTab screenshot (it's an OS
+    // overlay, not part of the page), so this is safe visual feedback during
+    // the capture window while the note-creation form itself is kept off
+    // screen.
+    document.body.style.cursor = "wait";
+
     const captureResponse = await new Promise((resolve) => {
       chrome.runtime.sendMessage(
         {
@@ -242,6 +246,8 @@
         resolve
       );
     });
+
+    document.body.style.cursor = "";
 
     showAnnotationForm(e.clientX, e.clientY, { selector, xPercent, yPercent }, captureResponse);
   }
