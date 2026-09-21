@@ -74,11 +74,15 @@ function renderNotes(notes) {
       note.status === "done"
         ? `<span class="noteMeta">&#10003; Completed by <span style="color:#188038;font-size:15px;font-weight:700;">${escapeHtml(note.completed_by || "Anonymous")}</span> &middot; ${new Date(note.completed_at).toLocaleString()}</span>`
         : "";
+    const referenceHtml = note.reference
+      ? `<span class="noteMeta">&#128222; Reference: <strong>${escapeHtml(note.reference)}</strong></span>`
+      : "";
     li.innerHTML = `
       <span class="badge ${note.category}">${note.category}</span>
       <span class="noteText">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</span>
       ${screenshotHtml}
       <span class="noteMeta">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</span>
+      ${referenceHtml}
       ${completedHtml}
       <label style="display:block;font-size:11px;color:#666;margin-top:4px;">Assigned to:</label>
       <select class="assigneeSelect" data-id="${note.id}" style="width:100%;padding:3px;font-size:12px;margin-top:2px;">
@@ -179,6 +183,7 @@ function renderQuickNoteForm() {
   quickNoteFormEl.innerHTML = `
     <div class="catRow">${categoryButtonsHtml}</div>
     <textarea id="qn-text" placeholder="What's the note? (no page selection needed)"></textarea>
+    <input type="text" id="qn-reference" placeholder="Reference (e.g. phone number)" style="width:100%;padding:4px;font-size:12px;margin-bottom:6px;box-sizing:border-box;" />
     <select id="qn-assignee"><option>Loading&hellip;</option></select>
     <div class="formActions">
       <button id="qn-save">Save</button>
@@ -209,6 +214,7 @@ function renderQuickNoteForm() {
 
   quickNoteFormEl.querySelector("#qn-save").addEventListener("click", async () => {
     const text = quickNoteFormEl.querySelector("#qn-text").value.trim();
+    const reference = quickNoteFormEl.querySelector("#qn-reference").value.trim();
     const { spfMyName } = await chrome.storage.local.get(["spfMyName"]);
 
     await sendMessage({
@@ -218,6 +224,7 @@ function renderQuickNoteForm() {
         pageTitle: activeTabTitle,
         category: selectedCategory,
         text,
+        reference,
         author: spfMyName || "Anonymous",
         assignedTo: selectedAssignee,
       },

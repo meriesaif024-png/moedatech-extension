@@ -114,11 +114,15 @@ function render(notes) {
         note.status === "done"
           ? `<span class="noteMeta">&#10003; Completed by <span style="color:#188038;font-size:15px;font-weight:700;">${escapeHtml(note.completed_by || "Anonymous")}</span> &middot; ${new Date(note.completed_at).toLocaleString()}</span>`
           : "";
+      const referenceHtml = note.reference
+        ? `<span class="noteMeta">&#128222; Reference: <strong>${escapeHtml(note.reference)}</strong></span>`
+        : "";
       div.innerHTML = `
         <span class="badge ${note.category}">${note.category}</span>
         <span class="noteMeta">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</span>
         <span class="noteText">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</span>
         ${screenshotHtml}
+        ${referenceHtml}
         ${completedHtml}
         <label style="display:block;font-size:11px;color:#666;margin-top:4px;">Assigned to:</label>
         <select class="assigneeSelect" data-id="${note.id}" style="padding:3px;font-size:12px;margin:2px 0 6px;">

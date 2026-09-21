@@ -290,6 +290,7 @@
       <div id="spf-shot-preview" style="margin-bottom:6px;">${previewHtml}</div>
       ${includeToggleHtml}
       <textarea id="spf-text" placeholder="What's the note?" style="width:100%;height:60px;margin-bottom:6px;padding:4px;font-size:12px;"></textarea>
+      <input type="text" id="spf-reference" placeholder="Reference (e.g. phone number)" style="width:100%;margin-bottom:6px;padding:4px;font-size:12px;box-sizing:border-box;" />
       <select id="spf-assignee" style="width:100%;margin-bottom:6px;padding:4px;font-size:12px;">
         <option>Loading&hellip;</option>
       </select>
@@ -330,6 +331,7 @@
 
     saveBtn.addEventListener("click", async () => {
       const text = form.querySelector("#spf-text").value.trim();
+      const reference = form.querySelector("#spf-reference").value.trim();
       const author = await getAuthor();
       const includeShot = includeShotCheckbox ? includeShotCheckbox.checked : false;
 
@@ -344,6 +346,7 @@
             yPercent: position.yPercent,
             category: selectedCategory,
             text,
+            reference,
             author,
             screenshot: includeShot ? screenshotDataUrl : null,
             assignedTo: selectedAssignee,
