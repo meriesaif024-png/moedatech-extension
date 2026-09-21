@@ -266,7 +266,8 @@
     const form = document.createElement("div");
     form.style.cssText = `
       position:fixed;left:${Math.min(clientX, window.innerWidth - 260)}px;top:${Math.min(clientY, window.innerHeight - 300)}px;
-      width:240px;background:white;color:#1f1f1f;border-radius:8px;
+      width:240px;max-height:calc(100vh - 20px);overflow-y:auto;
+      background:white;color:#1f1f1f;border-radius:8px;
       box-shadow:0 4px 16px rgba(0,0,0,0.3);padding:10px;
       font-size:12px;z-index:2147483647;
     `;
@@ -300,6 +301,15 @@
       </div>
     `;
     getRoot().appendChild(form);
+
+    // Reposition using the form's real rendered size, so Save/Cancel are
+    // never pushed off-screen when clicking near the bottom or right edge.
+    const formRect = form.getBoundingClientRect();
+    const clampedLeft = Math.max(10, Math.min(clientX, window.innerWidth - formRect.width - 10));
+    const clampedTop = Math.max(10, Math.min(clientY, window.innerHeight - formRect.height - 10));
+    form.style.left = `${clampedLeft}px`;
+    form.style.top = `${clampedTop}px`;
+
     form.querySelector("#spf-text").focus();
 
     form.querySelectorAll(".spf-cat-btn").forEach((btn) => {
