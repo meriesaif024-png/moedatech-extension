@@ -70,6 +70,9 @@ function renderNotes(notes) {
     const screenshotHtml = note.screenshot
       ? `<img src="${note.screenshot}" data-action="open-image" style="max-width:100%;border-radius:4px;margin-top:4px;cursor:pointer;" title="Click to view full size" />`
       : "";
+    const videoHtml = note.video_url
+      ? `<video src="${note.video_url}" controls style="max-width:100%;border-radius:4px;margin-top:4px;"></video>`
+      : "";
     const completedHtml =
       note.status === "done"
         ? `<span class="noteMeta">&#10003; Completed by <span style="color:#188038;font-size:15px;font-weight:700;">${escapeHtml(note.completed_by || "Anonymous")}</span> &middot; ${new Date(note.completed_at).toLocaleString()}</span>`
@@ -81,6 +84,7 @@ function renderNotes(notes) {
       <span class="badge ${note.category}">${note.category}</span>
       <span class="noteText">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</span>
       ${screenshotHtml}
+      ${videoHtml}
       <span class="noteMeta">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</span>
       ${referenceHtml}
       ${completedHtml}
@@ -244,11 +248,11 @@ document.getElementById("quickNote").addEventListener("click", () => {
   }
 });
 
-document.getElementById("addNote").addEventListener("click", async () => {
+async function sendToContentScript(messageType) {
   if (activeTabId == null) return;
 
   try {
-    await chrome.tabs.sendMessage(activeTabId, { type: "SPF_START_ANNOTATE" });
+    await chrome.tabs.sendMessage(activeTabId, { type: messageType });
     window.close();
     return;
   } catch (err) {
@@ -259,12 +263,16 @@ document.getElementById("addNote").addEventListener("click", async () => {
 
   try {
     await chrome.scripting.executeScript({ target: { tabId: activeTabId }, files: ["content.js"] });
-    await chrome.tabs.sendMessage(activeTabId, { type: "SPF_START_ANNOTATE" });
+    await chrome.tabs.sendMessage(activeTabId, { type: messageType });
     window.close();
   } catch (err) {
-    statusEl.textContent = "Can't annotate this page - it may not be a supported site.";
+    statusEl.textContent = "Can't use this on the current page - it may not be a supported site.";
   }
-});
+}
+
+document.getElementById("addNote").addEventListener("click", () => sendToContentScript("SPF_START_ANNOTATE"));
+
+document.getElementById("recordVideo").addEventListener("click", () => sendToContentScript("SPF_START_RECORD_FLOW"));
 
 document.getElementById("viewAll").addEventListener("click", (e) => {
   e.preventDefault();

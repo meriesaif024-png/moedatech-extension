@@ -110,6 +110,9 @@ function render(notes) {
       const screenshotHtml = note.screenshot
         ? `<img src="${note.screenshot}" data-action="open-image" style="max-width:280px;border-radius:4px;display:block;margin-top:4px;cursor:pointer;" title="Click to view full size" />`
         : "";
+      const videoHtml = note.video_url
+        ? `<video src="${note.video_url}" controls style="max-width:280px;border-radius:4px;display:block;margin-top:4px;"></video>`
+        : "";
       const completedHtml =
         note.status === "done"
           ? `<span class="noteMeta">&#10003; Completed by <span style="color:#188038;font-size:15px;font-weight:700;">${escapeHtml(note.completed_by || "Anonymous")}</span> &middot; ${new Date(note.completed_at).toLocaleString()}</span>`
@@ -122,6 +125,7 @@ function render(notes) {
         <span class="noteMeta">${escapeHtml(note.author || "Anonymous")} &middot; ${new Date(note.created_at).toLocaleString()}</span>
         <span class="noteText">${note.text ? escapeHtml(note.text) : '<em style="color:#999;">(no note)</em>'}</span>
         ${screenshotHtml}
+        ${videoHtml}
         ${referenceHtml}
         ${completedHtml}
         <label style="display:block;font-size:11px;color:#666;margin-top:4px;">Assigned to:</label>

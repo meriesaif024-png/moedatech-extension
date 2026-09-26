@@ -1,6 +1,9 @@
 const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
+const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const crypto = require("crypto");
 
 const connectionString = process.env.DATABASE_URL;
 const useSSL = /sslmode=require/.test(connectionString || "") || /proxy\.rlwy\.net/.test(connectionString || "");
@@ -11,6 +14,31 @@ const pool = new Pool({
 });
 
 const API_KEY = process.env.API_KEY;
+
+const VIDEO_BUCKET = process.env.VIDEO_BUCKET;
+const s3 = new S3Client({
+  region: process.env.VIDEO_BUCKET_REGION,
+  endpoint: process.env.VIDEO_BUCKET_ENDPOINT,
+  credentials: {
+    accessKeyId: process.env.VIDEO_BUCKET_ACCESS_KEY_ID,
+    secretAccessKey: process.env.VIDEO_BUCKET_SECRET_ACCESS_KEY,
+  },
+});
+
+const VIDEO_URL_EXPIRY_SECONDS = 604800; // 7 days, the max a SigV4 presigned URL allows
+
+async function getVideoUrl(key) {
+  if (!key) return null;
+  return getSignedUrl(s3, new GetObjectCommand({ Bucket: VIDEO_BUCKET, Key: key }), {
+    expiresIn: VIDEO_URL_EXPIRY_SECONDS,
+  });
+}
+
+async function withVideoUrls(rows) {
+  return Promise.all(
+    rows.map(async (row) => ({ ...row, video_url: await getVideoUrl(row.video_key) }))
+  );
+}
 
 async function init() {
   await pool.query(`
@@ -42,6 +70,7 @@ async function init() {
   await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS assigned_to TEXT;`);
   await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMPTZ;`);
   await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS reference TEXT;`);
+  await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS video_key TEXT;`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS team_members (
@@ -72,7 +101,7 @@ app.get("/api/notes", async (req, res) => {
   const result = url
     ? await pool.query("SELECT * FROM notes WHERE url = $1 ORDER BY created_at DESC", [url])
     : await pool.query("SELECT * FROM notes ORDER BY created_at DESC LIMIT 500");
-  res.json(result.rows);
+  res.json(await withVideoUrls(result.rows));
 });
 
 app.post("/api/notes", async (req, res) => {
@@ -89,12 +118,13 @@ app.post("/api/notes", async (req, res) => {
     tabSelectors,
     assignedTo,
     reference,
+    videoKey,
   } = req.body;
   if (!url) return res.status(400).json({ error: "url is required" });
 
   const result = await pool.query(
-    `INSERT INTO notes (url, page_title, selector, x_percent, y_percent, category, text, author, screenshot, tab_selectors, assigned_to, assigned_at, reference)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+    `INSERT INTO notes (url, page_title, selector, x_percent, y_percent, category, text, author, screenshot, tab_selectors, assigned_to, assigned_at, reference, video_key)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
     [
       url,
       pageTitle || null,
@@ -109,9 +139,24 @@ app.post("/api/notes", async (req, res) => {
       assignedTo || null,
       assignedTo ? new Date() : null,
       reference || null,
+      videoKey || null,
     ]
   );
-  res.status(201).json(result.rows[0]);
+  const [noteWithUrl] = await withVideoUrls([result.rows[0]]);
+  res.status(201).json(noteWithUrl);
+});
+
+// Accepts raw video bytes (webm) and stores them in the bucket, returning a
+// key to reference from a note - not the video itself, since it's too large
+// for the notes table and presigned URLs expire.
+app.post("/api/videos", express.raw({ type: "video/webm", limit: "80mb" }), async (req, res) => {
+  if (!req.body || !req.body.length) return res.status(400).json({ error: "no video data received" });
+
+  const key = `videos/${Date.now()}-${crypto.randomBytes(8).toString("hex")}.webm`;
+  await s3.send(
+    new PutObjectCommand({ Bucket: VIDEO_BUCKET, Key: key, Body: req.body, ContentType: "video/webm" })
+  );
+  res.status(201).json({ key });
 });
 
 app.patch("/api/notes/:id", async (req, res) => {

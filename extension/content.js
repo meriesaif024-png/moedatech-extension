@@ -369,9 +369,176 @@
     });
   }
 
+  let recording = false;
+  let recordBanner = null;
+  let cursorDot = null;
+
+  function startVideoRecording() {
+    if (recording) return;
+    recording = true;
+
+    cursorDot = document.createElement("div");
+    cursorDot.style.cssText = `
+      position:fixed;width:18px;height:18px;border-radius:50%;
+      background:rgba(217,48,37,0.55);border:2px solid #d93025;
+      pointer-events:none;z-index:2147483647;transform:translate(-50%,-50%);
+      display:none;transition:transform 0.12s;
+    `;
+    getRoot().appendChild(cursorDot);
+    document.addEventListener("mousemove", onRecordMouseMove, true);
+    document.addEventListener("mousedown", onRecordClickPulse, true);
+
+    recordBanner = document.createElement("div");
+    recordBanner.style.cssText = `
+      position:fixed;top:12px;left:50%;transform:translateX(-50%);
+      background:#d93025;color:white;padding:8px 14px;border-radius:20px;
+      font-size:12px;z-index:2147483647;display:flex;align-items:center;gap:10px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.3);
+    `;
+    recordBanner.innerHTML = `
+      <span style="width:8px;height:8px;border-radius:50%;background:white;"></span>
+      Recording&hellip;
+      <button id="spf-stop-record" style="background:white;color:#d93025;border:none;border-radius:12px;padding:3px 10px;font-weight:600;cursor:pointer;">Stop</button>
+    `;
+    getRoot().appendChild(recordBanner);
+    recordBanner.querySelector("#spf-stop-record").addEventListener("click", stopVideoRecording);
+
+    chrome.runtime.sendMessage({ type: "SPF_START_RECORDING" }, (response) => {
+      if (response?.error) {
+        alert(`Could not start recording: ${response.error}`);
+        cleanupRecordingUI();
+      }
+    });
+  }
+
+  function onRecordMouseMove(e) {
+    cursorDot.style.display = "block";
+    cursorDot.style.left = e.clientX + "px";
+    cursorDot.style.top = e.clientY + "px";
+  }
+
+  function onRecordClickPulse() {
+    cursorDot.style.transform = "translate(-50%,-50%) scale(1.6)";
+    setTimeout(() => {
+      if (cursorDot) cursorDot.style.transform = "translate(-50%,-50%) scale(1)";
+    }, 150);
+  }
+
+  function cleanupRecordingUI() {
+    recording = false;
+    document.removeEventListener("mousemove", onRecordMouseMove, true);
+    document.removeEventListener("mousedown", onRecordClickPulse, true);
+    cursorDot?.remove();
+    cursorDot = null;
+    recordBanner?.remove();
+    recordBanner = null;
+  }
+
+  function stopVideoRecording() {
+    cleanupRecordingUI();
+
+    const statusMsg = document.createElement("div");
+    statusMsg.style.cssText = `
+      position:fixed;top:12px;left:50%;transform:translateX(-50%);
+      background:#1f1f1f;color:white;padding:8px 14px;border-radius:20px;
+      font-size:12px;z-index:2147483647;
+    `;
+    statusMsg.textContent = "Uploading video…";
+    getRoot().appendChild(statusMsg);
+
+    chrome.runtime.sendMessage({ type: "SPF_STOP_RECORDING" }, (response) => {
+      statusMsg.remove();
+      if (response?.error) {
+        alert(`Could not save recording: ${response.error}`);
+        return;
+      }
+      showVideoNoteForm(response.videoKey);
+    });
+  }
+
+  async function showVideoNoteForm(videoKey) {
+    let selectedCategory = "bug";
+
+    const form = document.createElement("div");
+    form.style.cssText = `
+      position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+      width:260px;max-height:calc(100vh - 20px);overflow-y:auto;
+      background:white;color:#1f1f1f;border-radius:8px;
+      box-shadow:0 4px 16px rgba(0,0,0,0.3);padding:10px;
+      font-size:12px;z-index:2147483647;
+    `;
+
+    const categoryButtonsHtml = CATEGORIES.map(
+      (c) => `<button type="button" data-category="${c.key}" class="spf-vcat-btn" style="flex:1;padding:5px 0;border:1px solid ${CATEGORY_COLORS[c.key]};background:${c.key === selectedCategory ? CATEGORY_COLORS[c.key] : "white"};color:${c.key === selectedCategory ? "white" : CATEGORY_COLORS[c.key]};border-radius:4px;">${c.label}</button>`
+    ).join("");
+
+    form.innerHTML = `
+      <div style="display:flex;gap:4px;margin-bottom:6px;">${categoryButtonsHtml}</div>
+      <div style="margin-bottom:6px;font-size:11px;color:#188038;">&#127909; Video recorded and uploaded</div>
+      <textarea id="spf-vtext" placeholder="What's the note?" style="width:100%;height:60px;margin-bottom:6px;padding:4px;font-size:12px;"></textarea>
+      <input type="text" id="spf-vreference" placeholder="Reference (e.g. phone number)" style="width:100%;margin-bottom:6px;padding:4px;font-size:12px;box-sizing:border-box;" />
+      <select id="spf-vassignee" style="width:100%;margin-bottom:6px;padding:4px;font-size:12px;">
+        <option>Loading&hellip;</option>
+      </select>
+      <div style="display:flex;gap:6px;">
+        <button id="spf-vsave" style="flex:1;padding:6px 0;">Save</button>
+        <button id="spf-vcancel" style="flex:1;padding:6px 0;">Cancel</button>
+      </div>
+    `;
+    getRoot().appendChild(form);
+    form.querySelector("#spf-vtext").focus();
+
+    form.querySelectorAll(".spf-vcat-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        selectedCategory = btn.dataset.category;
+        form.querySelectorAll(".spf-vcat-btn").forEach((b) => {
+          const color = CATEGORY_COLORS[b.dataset.category];
+          const active = b.dataset.category === selectedCategory;
+          b.style.background = active ? color : "white";
+          b.style.color = active ? "white" : color;
+        });
+      });
+    });
+
+    let selectedAssignee = null;
+    wireAssigneeSelect(form.querySelector("#spf-vassignee"), null, (assignedTo) => {
+      selectedAssignee = assignedTo;
+    });
+
+    form.querySelector("#spf-vcancel").addEventListener("click", () => form.remove());
+
+    form.querySelector("#spf-vsave").addEventListener("click", async () => {
+      const text = form.querySelector("#spf-vtext").value.trim();
+      const reference = form.querySelector("#spf-vreference").value.trim();
+      const author = await getAuthor();
+
+      chrome.runtime.sendMessage(
+        {
+          type: "SPF_ADD_NOTE",
+          note: {
+            url: location.href,
+            pageTitle: document.title,
+            category: selectedCategory,
+            text,
+            reference,
+            author,
+            videoKey,
+            assignedTo: selectedAssignee,
+          },
+        },
+        () => {
+          form.remove();
+        }
+      );
+    });
+  }
+
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === "SPF_START_ANNOTATE") {
       startAnnotate();
+    }
+    if (message.type === "SPF_START_RECORD_FLOW") {
+      startVideoRecording();
     }
   });
 })();

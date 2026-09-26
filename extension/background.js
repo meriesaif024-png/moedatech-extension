@@ -88,6 +88,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     openOrFocusDashboard();
     return;
   }
+
+  if (message.type === "SPF_START_RECORDING") {
+    const tabId = sender.tab?.id;
+    startRecording(tabId)
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
+
+  if (message.type === "SPF_STOP_RECORDING") {
+    stopRecordingAndUpload()
+      .then((videoKey) => sendResponse({ videoKey }))
+      .catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
 });
 
 const COMPLETION_CHECK_ALARM = "spfCheckCompletions";
@@ -112,9 +127,30 @@ async function ensureOffscreenDocument() {
   if (has) return;
   await chrome.offscreen.createDocument({
     url: "offscreen.html",
-    reasons: ["AUDIO_PLAYBACK"],
-    justification: "Play a sound when a note notification arrives",
+    reasons: ["AUDIO_PLAYBACK", "USER_MEDIA"],
+    justification: "Play a notification sound and record tab video for feedback notes",
   });
+}
+
+async function startRecording(tabId) {
+  const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
+  await ensureOffscreenDocument();
+  const response = await chrome.runtime.sendMessage({ type: "SPF_BEGIN_RECORD", streamId });
+  if (response?.error) throw new Error(response.error);
+}
+
+async function stopRecordingAndUpload() {
+  const response = await chrome.runtime.sendMessage({ type: "SPF_END_RECORD" });
+  if (response?.error) throw new Error(response.error);
+
+  const uploadRes = await fetch(`${API_BASE}/api/videos`, {
+    method: "POST",
+    headers: { "Content-Type": "video/webm", "x-api-key": API_KEY },
+    body: response.bytes,
+  });
+  if (!uploadRes.ok) throw new Error(`Video upload failed: ${uploadRes.status}`);
+  const { key } = await uploadRes.json();
+  return key;
 }
 
 async function playNotificationSound() {
