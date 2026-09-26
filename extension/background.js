@@ -2,6 +2,12 @@ importScripts("config.js");
 
 const API_BASE = "https://feedback-api-production-8bc5.up.railway.app";
 
+// A now-removed earlier version disabled the toolbar popup while recording
+// (chrome.action.setPopup persists across reloads, unlike code). Reassert
+// the real popup every time the service worker starts so a leftover
+// disabled state from that version can never get anyone stuck.
+chrome.action.setPopup({ popup: "popup.html" });
+
 async function api(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
