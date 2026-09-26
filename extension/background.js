@@ -92,16 +92,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "SPF_START_RECORDING") {
     const tabId = sender.tab?.id;
     startRecording(tabId)
-      .then(() => sendResponse({ ok: true }))
+      .then(async () => {
+        await beginRecordingUi(tabId);
+        sendResponse({ ok: true });
+      })
       .catch((err) => sendResponse({ error: err.message }));
     return true;
   }
+});
 
-  if (message.type === "SPF_STOP_RECORDING") {
-    stopRecordingAndUpload()
-      .then((videoKey) => sendResponse({ videoKey }))
-      .catch((err) => sendResponse({ error: err.message }));
-    return true;
+// While recording, the "Stop" control lives on the toolbar icon instead of
+// as an on-page banner - a page overlay would itself get captured by
+// tabCapture and show up in the recording. Disabling the default popup
+// makes the icon click fire onClicked instead of opening it.
+let recordingTabId = null;
+
+async function beginRecordingUi(tabId) {
+  recordingTabId = tabId;
+  await chrome.action.setPopup({ popup: "" });
+  await chrome.action.setBadgeText({ text: "⏺" });
+  await chrome.action.setBadgeBackgroundColor({ color: "#d93025" });
+  await chrome.action.setTitle({ title: "Recording… click to stop" });
+}
+
+async function endRecordingUi() {
+  recordingTabId = null;
+  await chrome.action.setPopup({ popup: "popup.html" });
+  await chrome.action.setBadgeText({ text: "" });
+  await chrome.action.setTitle({ title: "Moedatech Detector" });
+}
+
+chrome.action.onClicked.addListener(async (tab) => {
+  if (recordingTabId == null) return;
+  const tabId = recordingTabId;
+  await endRecordingUi();
+  chrome.tabs.sendMessage(tabId, { type: "SPF_RECORDING_STOPPING" }).catch(() => {});
+  try {
+    const videoKey = await stopRecordingAndUpload();
+    chrome.tabs.sendMessage(tabId, { type: "SPF_RECORDING_STOPPED", videoKey });
+  } catch (err) {
+    chrome.tabs.sendMessage(tabId, { type: "SPF_RECORDING_STOPPED", error: err.message });
   }
 });
 

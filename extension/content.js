@@ -370,9 +370,13 @@
   }
 
   let recording = false;
-  let recordBanner = null;
   let cursorDot = null;
+  let uploadingToast = null;
 
+  // The "Stop" control lives on the extension's toolbar icon, not as an
+  // on-page banner - tabCapture records the tab's actual rendered pixels,
+  // so any in-page overlay (other than the cursor dot, which is meant to
+  // be seen) would end up baked into the video itself.
   function startVideoRecording() {
     if (recording) return;
     recording = true;
@@ -387,21 +391,6 @@
     getRoot().appendChild(cursorDot);
     document.addEventListener("mousemove", onRecordMouseMove, true);
     document.addEventListener("mousedown", onRecordClickPulse, true);
-
-    recordBanner = document.createElement("div");
-    recordBanner.style.cssText = `
-      position:fixed;top:12px;left:50%;transform:translateX(-50%);
-      background:#d93025;color:white;padding:8px 14px;border-radius:20px;
-      font-size:12px;z-index:2147483647;display:flex;align-items:center;gap:10px;
-      box-shadow:0 2px 8px rgba(0,0,0,0.3);
-    `;
-    recordBanner.innerHTML = `
-      <span style="width:8px;height:8px;border-radius:50%;background:white;"></span>
-      Recording&hellip;
-      <button id="spf-stop-record" style="background:white;color:#d93025;border:none;border-radius:12px;padding:3px 10px;font-weight:600;cursor:pointer;">Stop</button>
-    `;
-    getRoot().appendChild(recordBanner);
-    recordBanner.querySelector("#spf-stop-record").addEventListener("click", stopVideoRecording);
 
     chrome.runtime.sendMessage({ type: "SPF_START_RECORDING" }, (response) => {
       if (response?.error) {
@@ -430,30 +419,17 @@
     document.removeEventListener("mousedown", onRecordClickPulse, true);
     cursorDot?.remove();
     cursorDot = null;
-    recordBanner?.remove();
-    recordBanner = null;
   }
 
-  function stopVideoRecording() {
-    cleanupRecordingUI();
-
-    const statusMsg = document.createElement("div");
-    statusMsg.style.cssText = `
+  function showUploadingToast() {
+    uploadingToast = document.createElement("div");
+    uploadingToast.style.cssText = `
       position:fixed;top:12px;left:50%;transform:translateX(-50%);
       background:#1f1f1f;color:white;padding:8px 14px;border-radius:20px;
       font-size:12px;z-index:2147483647;
     `;
-    statusMsg.textContent = "Uploading video…";
-    getRoot().appendChild(statusMsg);
-
-    chrome.runtime.sendMessage({ type: "SPF_STOP_RECORDING" }, (response) => {
-      statusMsg.remove();
-      if (response?.error) {
-        alert(`Could not save recording: ${response.error}`);
-        return;
-      }
-      showVideoNoteForm(response.videoKey);
-    });
+    uploadingToast.textContent = "Uploading video…";
+    getRoot().appendChild(uploadingToast);
   }
 
   async function showVideoNoteForm(videoKey) {
@@ -539,6 +515,19 @@
     }
     if (message.type === "SPF_START_RECORD_FLOW") {
       startVideoRecording();
+    }
+    if (message.type === "SPF_RECORDING_STOPPING") {
+      cleanupRecordingUI();
+      showUploadingToast();
+    }
+    if (message.type === "SPF_RECORDING_STOPPED") {
+      uploadingToast?.remove();
+      uploadingToast = null;
+      if (message.error) {
+        alert(`Could not save recording: ${message.error}`);
+      } else {
+        showVideoNoteForm(message.videoKey);
+      }
     }
   });
 })();
