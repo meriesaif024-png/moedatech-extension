@@ -55,8 +55,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       recordedChunks = [];
       currentStream = null;
 
-      sendResponse({ ok: true, bytes: new Uint8Array(arrayBuffer) });
+      // chrome.runtime messages are JSON-serialized, which mangles a
+      // Uint8Array into a plain object (and then into garbage if used
+      // directly as a fetch body) - base64 survives the trip intact.
+      sendResponse({ ok: true, base64: arrayBufferToBase64(arrayBuffer) });
     })();
     return true;
   }
 });
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}

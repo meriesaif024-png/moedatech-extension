@@ -143,10 +143,14 @@ async function stopRecordingAndUpload() {
   const response = await chrome.runtime.sendMessage({ type: "SPF_END_RECORD" });
   if (response?.error) throw new Error(response.error);
 
+  const binary = atob(response.base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
   const uploadRes = await fetch(`${API_BASE}/api/videos`, {
     method: "POST",
     headers: { "Content-Type": "video/webm", "x-api-key": API_KEY },
-    body: response.bytes,
+    body: bytes,
   });
   if (!uploadRes.ok) throw new Error(`Video upload failed: ${uploadRes.status}`);
   const { key } = await uploadRes.json();
