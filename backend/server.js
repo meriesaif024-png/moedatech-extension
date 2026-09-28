@@ -27,6 +27,59 @@ const s3 = new S3Client({
 
 const VIDEO_URL_EXPIRY_SECONDS = 604800; // 7 days, the max a SigV4 presigned URL allows
 
+const PRIVACY_POLICY_HTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moedatech Detector - Privacy Policy</title>
+<style>
+  body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; color: #1d2a38; background: #f6f3ec; }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 48px 20px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .updated { font-size: 13px; color: #66707a; margin-bottom: 32px; }
+  h2 { font-size: 17px; margin: 28px 0 8px; }
+  p, li { font-size: 14.5px; color: #3d4a58; }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  code { background: #eee3c8; padding: 1px 6px; border-radius: 5px; font-size: 13px; }
+  .contact { margin-top: 36px; padding-top: 16px; border-top: 1px solid #ddd3ba; font-size: 13.5px; color: #66707a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Moedatech Detector - Privacy Policy</h1>
+  <p class="updated">Last updated September 2026</p>
+
+  <p>Moedatech Detector is an internal tool built for the Moedatech team to leave feedback notes on our own web applications. This page explains what information the extension collects, why, and who can see it.</p>
+
+  <h2>What we collect</h2>
+  <ul>
+    <li><strong>Your name</strong> - whatever you type into the "I am" field, used to attribute notes you create or complete.</li>
+    <li><strong>Note content</strong> - the text you write, the category you choose, and an optional reference field (e.g. a phone number) you may add for context.</li>
+    <li><strong>Screenshots</strong> - when you leave a note by clicking on the page, a screenshot of the visible page is captured automatically with the relevant spot highlighted.</li>
+    <li><strong>Screen recordings</strong> - when you use the "Record video" option, a short recording of the tab you're on is captured and attached to the note.</li>
+    <li><strong>Page URL and title</strong> - the address of the page a note was left on, so the team can find it again.</li>
+  </ul>
+  <p>We do not collect browsing history, passwords, payment information, microphone/camera audio, or any data from sites other than the specific Moedatech domains this extension operates on (<code>ai.moedatech.net</code>, <code>web-beta.moedatech.net</code>, <code>os.moedatech.net</code>).</p>
+
+  <h2>Where it's stored</h2>
+  <p>All data is stored in a private database and storage bucket hosted on Moedatech's own infrastructure. It is not sold, shared with advertisers, or made available to any third party outside the Moedatech team.</p>
+
+  <h2>Who can see it</h2>
+  <p>Only people who have installed this extension with a valid internal access key - in practice, members of the Moedatech team. There is no public access to this data.</p>
+
+  <h2>Your choices</h2>
+  <p>Any note can be deleted directly from the extension by anyone on the team. Since this is an internal tool without individual accounts, there's no separate "export my data" process - the dashboard view already shows everything the extension has stored.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>If what this extension collects or how it's used changes meaningfully, this page will be updated and the "Last updated" date above will change accordingly.</p>
+
+  <div class="contact">Questions about this policy? Contact <strong>saif@equiptal.net</strong>.</div>
+</div>
+</body>
+</html>`;
+
 async function getVideoUrl(key) {
   if (!key) return null;
   return getSignedUrl(s3, new GetObjectCommand({ Bucket: VIDEO_BUCKET, Key: key }), {
@@ -87,7 +140,7 @@ app.use(express.json({ limit: "5mb" }));
 
 app.use((req, res, next) => {
   if (!API_KEY) return next();
-  if (req.path === "/health") return next();
+  if (req.path === "/health" || req.path === "/privacy") return next();
   if (req.get("x-api-key") !== API_KEY) {
     return res.status(401).json({ error: "unauthorized" });
   }
@@ -95,6 +148,13 @@ app.use((req, res, next) => {
 });
 
 app.get("/health", (req, res) => res.json({ ok: true }));
+
+// Public, plain-HTML privacy policy page for the Chrome Web Store listing -
+// a JS-hosted artifact page was rejected as "not leading directly to a
+// valid privacy policy", so this needs to be a real static page.
+app.get("/privacy", (req, res) => {
+  res.type("html").send(PRIVACY_POLICY_HTML);
+});
 
 app.get("/api/notes", async (req, res) => {
   const { url } = req.query;
