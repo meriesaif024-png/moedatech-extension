@@ -276,8 +276,12 @@
       (c) => `<button type="button" data-category="${c.key}" class="spf-cat-btn" style="flex:1;padding:5px 0;border:1px solid ${CATEGORY_COLORS[c.key]};background:${c.key === selectedCategory ? CATEGORY_COLORS[c.key] : "white"};color:${c.key === selectedCategory ? "white" : CATEGORY_COLORS[c.key]};border-radius:4px;">${c.label}</button>`
     ).join("");
 
+    // Capped so a tall full-page screenshot can never push Save/Cancel out
+    // of easy reach - without this a tall image could stretch the form far
+    // past the visible area, leaving the buttons reachable only by
+    // scrolling inside the small floating box.
     const previewHtml = screenshotDataUrl
-      ? `<img src="${screenshotDataUrl}" style="max-width:100%;border-radius:4px;border:1px solid #eee;" />`
+      ? `<img src="${screenshotDataUrl}" style="display:block;max-width:100%;max-height:140px;margin:0 auto;object-fit:contain;border-radius:4px;border:1px solid #eee;" />`
       : `<div style="font-size:11px;color:#888;">Screenshot unavailable${captureResponse?.error ? ": " + captureResponse.error : ""}</div>`;
 
     const includeToggleHtml = screenshotDataUrl
